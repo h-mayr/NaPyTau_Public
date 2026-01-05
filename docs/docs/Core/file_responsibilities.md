@@ -11,25 +11,25 @@ The other functionality is to calculate polynomial coefficients. One function ju
 ### chi.py
 This file contains one function to calculate $\chi^{2}$ via this formula:
 
-$$
+```math
 \chi^{2} = \sum_{i}((\frac{I^{sh}_{i}-f^{(a_{1}, ..., a_{n})}(t_{i})}{\Delta I^{sh}_{i}})^2+w(\frac{I^{us}_{i} - \tilde{t}^{hyp}\frac{d}{dt}f^{(a_{1}, ..., a_{n})}(t_{i})}{\Delta I^{us}_{i}})^2)
-$$
+```
 
 and another function to optimize the tau factor $\tilde{t}^{hyp}$ by minimizing $\chi^{2}$. This optimization is implemented by using the minimize function from "scipy.optimize" with the mean of the total possible range of the tau factor as a starting point.
 
 ### tau.py
 This file provides functionality to calculate the lifetime $\tau_{i}$ via this formula:
 
-$$
+```math
 \tau_{i} = \frac{I^{us}_{i}}{\frac{d}{dt}f^{opt}(t_{i})}
-$$
+```
 with $f^{opt}(t_{i})$ being the fit function for the optimal $\tilde{t}^{hyp}$, i.e. $\tilde{t}^{opt}$.
 
 ### delta_tau.py
 Here we handle the error calculation for $\Delta\tau_{i}^{2}$. It follows this formula:
-$$
+```math
 \Delta\tau_{i}^{2} = \frac{\Delta I^{us2}_{i}}{\dot{P}^{2}_{j(i)}} + \frac{I^{us2}_{i}}{\dot{P}^{4}_{j(i)}} \Delta\dot{P}^{2}_{j(i)} + \frac{I^{us}_{i}\tilde{t}}{\dot{P}^{3}_{j(i)}} \Delta\dot{P}^2_{j(i)}
-$$
+```
 As a part of the error calculation we also need the covariance matrix, for the calculation of which a function is provided.
 
 ### tau_final.py
