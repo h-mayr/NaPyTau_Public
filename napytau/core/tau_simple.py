@@ -42,7 +42,7 @@ def calc_tau_simple(dataset: DataSet) -> np.ndarray:
         )
 
         differential_shifted_mean[i] = (
-            intensities_shifted[i + 1] - intensities_unshifted[i]
+            intensities_shifted[i + 1] - intensities_shifted[i]
         ) / (flight_times[i + 1] - flight_times[i])
         differential_shifted_mean_uncertainties[i] = np.sqrt(
             (1 / (flight_times[i + 1] - flight_times[i]) ** 2)
