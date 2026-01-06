@@ -2,8 +2,11 @@ from pathlib import PurePath
 from typing import List
 
 from napytau.cli.cli_arguments import CLIArguments
-from napytau.core.core import calculate_lifetime_for_custom_tau_factor, calculate_lifetime_for_fit, \
-    calculate_optimal_tau_factor
+from napytau.core.core import (
+    calculate_lifetime_for_custom_tau_factor,
+    calculate_lifetime_for_fit,
+    calculate_optimal_tau_factor,
+)
 from napytau.import_export.import_export import (
     IMPORT_FORMAT_LEGACY,
     IMPORT_FORMAT_NAPYTAU,
@@ -14,6 +17,7 @@ from napytau.import_export.import_export import (
 )
 from napytau.import_export.model.dataset import DataSet
 from napytau.util.coalesce import coalesce
+from napytau.core.tau_simple import calc_tau_simple
 
 
 def init(cli_arguments: CLIArguments) -> None:
@@ -52,20 +56,25 @@ def init(cli_arguments: CLIArguments) -> None:
                 )
                 print(f"    Active:  {datapoint.is_active()} ")
                 print("-" * 80)
-            
+
             (lifetime, err) = calculate_lifetime_for_fit(dataset, 3)
             print(f"  Lifetime: {lifetime} Error: {err}")
-            
+
             optimal_tau_factor = calculate_optimal_tau_factor(
                 dataset=dataset,
                 t_hyp_range=(0.0, 100.0),
                 weight_factor=1,
                 polynomial_degree=3,
             )
-            
-            (opt_lifetime, opt_err) = calculate_lifetime_for_custom_tau_factor(dataset, optimal_tau_factor, 1)
+
+            (opt_lifetime, opt_err) = calculate_lifetime_for_custom_tau_factor(
+                dataset, optimal_tau_factor, 1
+            )
             print(f"  Optimal Lifetime: {opt_lifetime} Error: {opt_err}")
             print("=" * 80)
+            if cli_arguments.is_simple_tau():
+                tau_simple = calc_tau_simple(dataset)
+                print(f"Tau simple calculation: {tau_simple}")
         setup_file_path = cli_arguments.get_setup_identifier()
         if setup_file_path is not None:
             for dataset in datasets:
@@ -93,9 +102,8 @@ def init(cli_arguments: CLIArguments) -> None:
                     print(f"    Active:  {datapoint.is_active()} ")
                     print("-" * 80)
         for dataset in datasets:
-                print("=" * 80)
-                
-        
+            print("=" * 80)
+
     elif cli_arguments.get_dataset_format() == IMPORT_FORMAT_NAPYTAU:
         setup_files_directory_path = cli_arguments.get_data_files_directory_path()
         setup_identifier = cli_arguments.get_setup_identifier()

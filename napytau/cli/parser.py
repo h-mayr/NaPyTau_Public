@@ -36,5 +36,8 @@ def parse_cli_arguments() -> CLIArguments:
         help="""Identifier of the setup to use with the dataset, file path for legacy
         format, or setup name for NaPyTau format""",
     )
+    parser.add_argument(
+        "--simple_tau", action="store_true", help="Calculate a first estimate of tau."
+    )
 
     return CLIArguments(parser.parse_args())
