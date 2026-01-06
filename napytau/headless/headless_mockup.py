@@ -73,8 +73,10 @@ def init(cli_arguments: CLIArguments) -> None:
             print(f"  Optimal Lifetime: {opt_lifetime} Error: {opt_err}")
             print("=" * 80)
             if cli_arguments.is_simple_tau():
-                tau_simple = calc_tau_simple(dataset)
-                print(f"Tau simple calculation: {tau_simple}")
+                tau_simple, tau_simple_uncertainty = calc_tau_simple(dataset)
+                print(
+                    f"Tau simple calculation: {tau_simple} +- {tau_simple_uncertainty}"
+                )
         setup_file_path = cli_arguments.get_setup_identifier()
         if setup_file_path is not None:
             for dataset in datasets:
