@@ -37,7 +37,7 @@ def parse_cli_arguments() -> CLIArguments:
         format, or setup name for NaPyTau format""",
     )
     parser.add_argument(
-        "--simple_tau", action="store_true", help="Calculate a first estimate of tau."
+        "--tau_simple", action="store_true", help="Calculate a first estimate of tau."
     )
 
     return CLIArguments(parser.parse_args())
