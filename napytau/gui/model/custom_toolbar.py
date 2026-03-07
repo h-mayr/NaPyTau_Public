@@ -1,3 +1,4 @@
+import tkinter as tk
 from tkinter import Frame
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,7 @@ from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvas
 class CustomToolbar(NavigationToolbar2Tk):
     def __init__(self, canvas: FigureCanvasTkAgg, window: Frame, parent: "App") -> None:
         super().__init__(canvas, window)
+        self._app = parent
 
         # Change background color of the message label
         self._message_label.config(
@@ -29,3 +31,23 @@ class CustomToolbar(NavigationToolbar2Tk):
         # Remove superfluous buttons
         self.winfo_children()[9].destroy()
         self.winfo_children()[6].destroy()
+
+        # Knot mode toggle button — reflects current state of graph._knot_mode
+        knot_active = parent.graph._knot_mode
+        self._knot_button = tk.Button(
+            self,
+            text="✦ Knots: ON" if knot_active else "✦ Knots: OFF",
+            bg="#ff8c00" if knot_active else "green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_knot_mode,
+        )
+        self._knot_button.pack(side=tk.LEFT, padx=2)
+
+    def _toggle_knot_mode(self) -> None:
+        self._app.graph.toggle_knot_mode()
+        if self._app.graph._knot_mode:
+            self._knot_button.config(text="✦ Knots: ON", bg="#ff8c00")
+        else:
+            self._knot_button.config(text="✦ Knots: OFF", bg="green")

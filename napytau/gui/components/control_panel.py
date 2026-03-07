@@ -351,6 +351,27 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         self.result_absolute_tau_t.set(absolute_tau_t)
 
+    def recalculate(self) -> None:
+        """
+        Re-run the lifetime calculation with the current tau factor and
+        update the result displays. Called automatically after knots change.
+        """
+        if not self._check_dataset_set():
+            return
+        try:
+            value = self.timescale.get()
+            lifetime = calculate_lifetime_for_custom_tau_factor(
+                coalesce(self.parent.dataset[0]),
+                value,
+                int(self.parent.menu_bar.number_of_polynomials.get()),
+            )
+            self.result_tau.set(str(lifetime[0]))
+            self.result_tau_error.set(str(lifetime[1]))
+        except Exception as e:
+            self.parent.logger.log_message(
+                f"Calculation failed: {e}", LogMessageType.ERROR
+            )
+
     def _check_dataset_set(self) -> bool:
         """
         Check if a dataset is set.

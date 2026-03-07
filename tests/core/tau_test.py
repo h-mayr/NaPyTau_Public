@@ -48,6 +48,8 @@ class TauUnitTest(unittest.TestCase):
             from napytau.core.tau import calculate_tau_i_values
 
             initial_coefficients: np.ndarray = np.array([1, 1, 1])
+            knots: np.ndarray = np.array([0.0, 0.0, 0.5, 1.0, 1.0])
+            degree: int = 1
             datapoints = DatapointCollection(
                 [
                     Datapoint(
@@ -73,6 +75,8 @@ class TauUnitTest(unittest.TestCase):
                 calculate_tau_i_values(
                     dataset,
                     initial_coefficients,
+                    knots,
+                    degree,
                 ),
                 expected_tau,
             )
@@ -96,4 +100,18 @@ class TauUnitTest(unittest.TestCase):
                     0
                 ].args[1],
                 (np.array([1, 1, 1])),
+            )
+
+            np.testing.assert_array_equal(
+                polynomials_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
+                    0
+                ].args[2],
+                knots,
+            )
+
+            self.assertEqual(
+                polynomials_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
+                    0
+                ].args[3],
+                degree,
             )

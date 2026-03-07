@@ -111,7 +111,7 @@ class App(customtkinter.CTk):
         self.toolbar: Toolbar = Toolbar(self, self.graph.canvas)
 
         # Initialize the control panel
-        self.control_panel = ControlPanel(self)
+        self.control_panel: ControlPanel = ControlPanel(self)
 
         # Initialize the logger
         self.logger: Logger = Logger(self)

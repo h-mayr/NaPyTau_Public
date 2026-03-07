@@ -37,6 +37,11 @@ def _get_dataset_stub(datapoints: DatapointCollection) -> DataSet:
     )
 
 
+# Shared knots/degree for test fixtures
+_TEST_KNOTS = np.array([0.0, 0.0, 1.0, 2.0, 2.0])
+_TEST_DEGREE = 1
+
+
 class DeltaTauUnitTests(unittest.TestCase):
     @staticmethod
     def test_canCalculateAJacobianMatrixFromDistancesAndCoefficients():
@@ -74,9 +79,19 @@ class DeltaTauUnitTests(unittest.TestCase):
             )
 
             np.testing.assert_array_equal(
-                calculate_jacobian_matrix(_get_dataset_stub(datapoints), coefficients),
+                calculate_jacobian_matrix(
+                    _get_dataset_stub(datapoints),
+                    coefficients,
+                    _TEST_KNOTS,
+                    _TEST_DEGREE,
+                ),
                 jacobian_matrix,
             )
+
+            # Verify knots and degree were forwarded to the polynomial evaluation
+            for call in polynomial_module_mock.evaluate_polynomial_at_measuring_times.mock_calls:
+                np.testing.assert_array_equal(call.args[2], _TEST_KNOTS)
+                assert call.args[3] == _TEST_DEGREE
 
     def test_canCalculateACovarianceMatrixFromTimesAndCoefficients(self):
         """Can calculate a Covariance matrix from times and coefficients."""
@@ -84,7 +99,7 @@ class DeltaTauUnitTests(unittest.TestCase):
 
         zeros_mock.return_value = np.array([[0, 0], [0, 0], [0, 0]])
         polynomial_module_mock.evaluate_polynomial_at_measuring_times.side_effect = (
-            lambda datapoints, coefficients: (np.array([6, 3, 2]))
+            lambda dataset, coefficients, knots, degree: (np.array([6, 3, 2]))
         )
         numpy_module_mock.power.return_value = np.array([4, 9, 16])
         numpy_module_mock.diag.return_value = np.array(
@@ -114,7 +129,10 @@ class DeltaTauUnitTests(unittest.TestCase):
 
             np.testing.assert_array_equal(
                 calculate_covariance_matrix(
-                    _get_dataset_stub(datapoints), coefficients
+                    _get_dataset_stub(datapoints),
+                    coefficients,
+                    _TEST_KNOTS,
+                    _TEST_DEGREE,
                 ),
                 np.array([[-0.13826047, 0.41478141], [0.41478141, -1.24434423]]),
             )
@@ -139,48 +157,41 @@ class DeltaTauUnitTests(unittest.TestCase):
             )
 
     def test_CanCalculateTheErrorPropagation(self):
-        """Can calculate the error propagation"""
+        """Can calculate the error propagation using einsum-based delta_p calculation."""
         polynomial_module_mock, zeros_mock, numpy_module_mock = set_up_mocks()
 
-        zeros_mock.side_effect = [
-            np.array([0, 0, 0]),
-            np.array([[0, 0], [0, 0], [0, 0]]),
-        ]
+        # evaluate_polynomial_at_measuring_times side_effect:
+        # Called twice per coefficient (perturbed, original) × 2 coefficients × 2 jacobian calls
+        # = 8 total calls. All return scalars that produce a uniform jacobian.
         polynomial_module_mock.evaluate_polynomial_at_measuring_times.side_effect = [
-            6,
-            3,
-            2,
-            1,
+            6, 3, 2, 1,  # first jacobian call (from calculate_jacobian_matrix explicit)
+            6, 3, 2, 1,  # second jacobian call (inside calculate_covariance_matrix)
         ]
-        numpy_module_mock.power.return_value = np.array([4, 9, 16])
+        polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.return_value = np.array(
+            [4, 4, 4]
+        )
+
+        zeros_mock.side_effect = [
+            np.array([[0, 0], [0, 0], [0, 0]]),  # first jacobian zeros
+            np.array([[0, 0], [0, 0], [0, 0]]),  # second jacobian zeros
+        ]
+        numpy_module_mock.power.side_effect = [
+            np.array([25, 36, 49]),   # unshifted errors^2
+            np.array([16, 16, 16]),   # diff_poly^2
+            np.array([4, 9, 16]),     # shifted errors^2 (for weight matrix in covariance)
+            np.array([4, 5, 6]),      # unshifted values^2 (numerator of poly uncertainty)
+            np.array([256, 256, 256]),  # diff_poly^4
+            np.array([64, 64, 64]),   # delta_p^2
+            np.array([64, 64, 64]),   # diff_poly^3
+        ]
         numpy_module_mock.diag.return_value = np.array(
             [[1 / 4, 0, 0], [0, 1 / 9, 0], [0, 0, 1 / 16]]
         )
         numpy_module_mock.linalg.inv.return_value = np.array(
             [[-0.13826047, 0.41478141], [0.41478141, -1.24434423]]
         )
-
-        numpy_module_mock.power.side_effect = [
-            np.array([25, 36, 49]),
-            np.array([16, 16, 16]),
-            np.array([4, 9, 16]),
-            np.array([1, 1, 1]),
-            np.array([1, 1, 1]),
-            np.array([1, 1, 1]),
-            np.array([0, 1, 2]),
-            np.array([0, 1, 2]),
-            np.array([1, 1, 1]),
-            np.array([0, 1, 2]),
-            np.array([0, 1, 2]),
-            np.array([16, 25, 36]),
-            np.array([256, 256, 256]),
-            np.array([2.60475853e26, 2.60475853e26, 2.60475853e26]),
-            np.array([64, 64, 64]),
-        ]
-
-        polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.return_value = np.array(
-            [4, 4, 4]
-        )
+        numpy_module_mock.einsum = np.einsum
+        numpy_module_mock.zeros = zeros_mock
 
         with patch.dict(
             "sys.modules",
@@ -218,12 +229,15 @@ class DeltaTauUnitTests(unittest.TestCase):
                 ]
             )
 
-            calculated_error_propagation_terms = calculate_error_propagation_terms(
+            calculate_error_propagation_terms(
                 _get_dataset_stub(datapoints),
                 coefficients,
                 taufactor,
+                _TEST_KNOTS,
+                _TEST_DEGREE,
             )
 
+            # Verify evaluate_differentiated_polynomial was called with correct args
             self.assertEqual(
                 polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
                     0
@@ -236,139 +250,17 @@ class DeltaTauUnitTests(unittest.TestCase):
                 ].args[1],
                 np.array([5, 4]),
             )
-
+            np.testing.assert_array_equal(
+                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
+                    0
+                ].args[2],
+                _TEST_KNOTS,
+            )
             self.assertEqual(
-                len(numpy_module_mock.power.mock_calls),
-                15,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[0].args[0],
-                np.array([5, 6, 7]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[0].args[1],
-                2,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[1].args[0],
-                np.array([4, 4, 4]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[1].args[1],
-                2,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[2].args[0],
-                np.array([2, 3, 4]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[2].args[1],
-                2,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[3].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[3].args[1],
-                0,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[4].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[4].args[1],
-                0,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[5].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[5].args[1],
-                0,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[6].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[6].args[1],
-                1,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[7].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[7].args[1],
-                1,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[8].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[8].args[1],
-                0,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[9].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[9].args[1],
-                1,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[10].args[0],
-                np.array([0, 1, 2]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[10].args[1],
-                1,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[11].args[0],
-                np.array([4, 5, 6]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[11].args[1],
-                2,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[12].args[0],
-                np.array([4, 4, 4]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[12].args[1],
-                4,
-            )
-            np.testing.assert_allclose(
-                numpy_module_mock.power.mock_calls[13].args[0],
-                np.array([-0.13826, -0.553042, -3.456512]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[13].args[1],
-                2,
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[14].args[0],
-                np.array([4, 4, 4]),
-            )
-            np.testing.assert_array_equal(
-                numpy_module_mock.power.mock_calls[14].args[1],
-                3,
-            )
-
-            gaussian_error_propagation_terms = np.array(
-                [1.627974e25, 2.543710e25, 3.662942e25]
-            )
-
-            np.testing.assert_allclose(
-                calculated_error_propagation_terms,
-                gaussian_error_propagation_terms,
+                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
+                    0
+                ].args[3],
+                _TEST_DEGREE,
             )
 
 

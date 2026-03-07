@@ -17,8 +17,8 @@ def calculate_lifetime_for_fit(
     """
     Docstring missing. To be implemented with issue #44.
     """
-    # Now we find the optimal coefficients for the given taufactor
-    coefficients: np.ndarray = calculate_polynomial_coefficients_for_fit(
+    # Fit the spline and get coefficients + knot sequence
+    coefficients, knots = calculate_polynomial_coefficients_for_fit(
         dataset, polynomial_degree
     )
 
@@ -26,6 +26,8 @@ def calculate_lifetime_for_fit(
     tau_i_values: np.ndarray = calculate_tau_i_values(
         dataset,
         coefficients,
+        knots,
+        polynomial_degree,
     )
 
     # And we calculate the respective errors for the lifetimes
@@ -33,6 +35,8 @@ def calculate_lifetime_for_fit(
         dataset,
         coefficients,
         0,
+        knots,
+        polynomial_degree,
     )
 
     # From lifetimes and associated errors we can now calculate the weighted mean
@@ -53,7 +57,7 @@ def calculate_optimal_tau_factor(
     """
     Docstring missing. To be implemented with issue #44.
     """
-    coefficients: np.ndarray = calculate_polynomial_coefficients_for_fit(
+    coefficients, knots = calculate_polynomial_coefficients_for_fit(
         dataset, polynomial_degree
     )
 
@@ -62,6 +66,8 @@ def calculate_optimal_tau_factor(
         weight_factor,
         coefficients,
         t_hyp_range,
+        knots,
+        polynomial_degree,
     )
 
     return optimal_t_hyp
@@ -75,8 +81,8 @@ def calculate_lifetime_for_custom_tau_factor(
     """
     Docstring missing. To be implemented with issue #44.
     """
-    # Now we find the optimal coefficients for the given taufactor
-    coefficients: np.ndarray = calculate_polynomial_coefficients_for_tau_factor(
+    # Find spline coefficients such that P(t)/P'(t) = custom_tau_factor
+    coefficients, knots = calculate_polynomial_coefficients_for_tau_factor(
         dataset,
         custom_tau_factor,
         polynomial_degree,
@@ -86,6 +92,8 @@ def calculate_lifetime_for_custom_tau_factor(
     tau_i_values: np.ndarray = calculate_tau_i_values(
         dataset,
         coefficients,
+        knots,
+        polynomial_degree,
     )
 
     # And we calculate the respective errors for the lifetimes
@@ -93,6 +101,8 @@ def calculate_lifetime_for_custom_tau_factor(
         dataset,
         coefficients,
         custom_tau_factor,
+        knots,
+        polynomial_degree,
     )
 
     # From lifetimes and associated errors we can now calculate the weighted mean

@@ -8,6 +8,8 @@ from napytau.import_export.model.dataset import DataSet
 def calculate_tau_i_values(
     dataset: DataSet,
     coefficients: np.ndarray,
+    knots: np.ndarray,
+    degree: int,
 ) -> np.ndarray:
     """
     Calculates the decay times (tau_i) based on the provided
@@ -15,12 +17,9 @@ def calculate_tau_i_values(
 
     Args:
         dataset (DataSet): The dataset of the experiment
-        initial_coefficients (ndarray):
-        Initial guess for the polynomial coefficients
-        t_hyp_range (tuple):
-        Range for hypothesis optimization (min, max)
-        weight_factor (float):
-        Weighting factor for unshifted intensities
+        coefficients (ndarray): B-spline coefficients
+        knots (ndarray): Full B-spline knot sequence
+        degree (int): Degree of the B-spline
 
     Returns:
         ndarray: Calculated decay times for each distance point.
@@ -29,7 +28,9 @@ def calculate_tau_i_values(
     # calculate decay times using the optimized coefficients
     tau_i_values: np.ndarray = (
         dataset.get_datapoints().get_unshifted_intensities().get_values()
-        / evaluate_differentiated_polynomial_at_measuring_times(dataset, coefficients)
+        / evaluate_differentiated_polynomial_at_measuring_times(
+            dataset, coefficients, knots, degree
+        )
     )
 
     return tau_i_values
