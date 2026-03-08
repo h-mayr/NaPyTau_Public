@@ -189,29 +189,35 @@ class PolynomialsUnitTest(unittest.TestCase):
                 _TEST_DEGREE,
             )
 
-    def test_CalculateCoefficientForFitRaisesValueErrorWhenSamplingPointsAreNone(
+    def test_CalculateCoefficientForFitFallsBackToUnivariateSplineWhenSamplingPointsAreNone(
         self,
     ):
-        """calculate_polynomial_coefficients_for_fit raises ValueError when sampling_points is None."""
+        """calculate_polynomial_coefficients_for_fit falls back to UnivariateSpline when sampling_points is None."""
         from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
 
         dataset = _get_dataset_stub(_three_point_datapoints())
         # dataset.sampling_points is None by default
 
-        with self.assertRaises(ValueError):
-            calculate_polynomial_coefficients_for_fit(dataset, degree=2)
+        coefficients, knots = calculate_polynomial_coefficients_for_fit(
+            dataset, degree=2
+        )
+        self.assertIsInstance(coefficients, np.ndarray)
+        self.assertIsInstance(knots, np.ndarray)
 
-    def test_CalculateCoefficientForFitRaisesValueErrorWhenSamplingPointsAreEmpty(
+    def test_CalculateCoefficientForFitFallsBackToUnivariateSplineWhenSamplingPointsAreEmpty(
         self,
     ):
-        """calculate_polynomial_coefficients_for_fit raises ValueError when sampling_points is empty."""
+        """calculate_polynomial_coefficients_for_fit falls back to UnivariateSpline when sampling_points is empty."""
         from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
 
         dataset = _get_dataset_stub(_three_point_datapoints())
         dataset.set_sampling_points([])
 
-        with self.assertRaises(ValueError):
-            calculate_polynomial_coefficients_for_fit(dataset, degree=2)
+        coefficients, knots = calculate_polynomial_coefficients_for_fit(
+            dataset, degree=2
+        )
+        self.assertIsInstance(coefficients, np.ndarray)
+        self.assertIsInstance(knots, np.ndarray)
 
     def test_CalculateCoefficientForFitReturnsTuple(self):
         """calculate_polynomial_coefficients_for_fit returns (coefficients, knots) tuple."""
@@ -220,8 +226,11 @@ class PolynomialsUnitTest(unittest.TestCase):
         )
 
         spline_mock = MagicMock()
-        spline_mock.c = np.array([1.0, 2.0, 3.0, 4.0])
-        spline_mock.t = np.array([0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])
+        spline_mock._eval_args = (
+            np.array([0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0]),
+            np.array([1.0, 2.0, 3.0, 4.0]),
+            2,
+        )
 
         dataset = _get_dataset_stub(_three_point_datapoints())
         dataset.set_sampling_points([0.5])
@@ -236,6 +245,34 @@ class PolynomialsUnitTest(unittest.TestCase):
         np.testing.assert_array_equal(
             result[1], np.array([0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])
         )
+
+    def test_CalculateCoefficientForFitUsesUnivariateSplineWhenSmoothingFactorSet(
+        self,
+    ):
+        """calculate_polynomial_coefficients_for_fit uses UnivariateSpline when smoothing_factor is set."""
+        from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
+
+        spline_mock = MagicMock()
+        spline_mock._eval_args = (
+            np.array([0.0, 0.0, 1.0, 2.0, 2.0]),
+            np.array([2.0, 5.0, 9.0]),
+            2,
+        )
+
+        dataset = _get_dataset_stub(_three_point_datapoints())
+
+        with patch(
+            "napytau.core.polynomials.UnivariateSpline"
+        ) as mock_univariate, patch(
+            "napytau.core.polynomials.LSQUnivariateSpline"
+        ) as mock_lsq:
+            mock_univariate.return_value = spline_mock
+            calculate_polynomial_coefficients_for_fit(
+                dataset, degree=2, smoothing_factor=1.0
+            )
+
+        mock_univariate.assert_called_once()
+        mock_lsq.assert_not_called()
 
 
 if __name__ == "__main__":

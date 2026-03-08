@@ -56,6 +56,10 @@ class App(customtkinter.CTk):
         self.tau = tk.IntVar()
         self.tau.set(2)
 
+        # Fit mode: None = LSQUnivariateSpline, float = UnivariateSpline smoothing
+        self.smoothing_factor: float | None = None
+        self.polynomial_degree: int = 2
+
         # configure window
         self.title("NaPyTau")
         width = 1366
@@ -94,9 +98,10 @@ class App(customtkinter.CTk):
             "read_setup": self.read_setup,
             "quit": self.quit,
             "change_appearance_mode": self.change_appearance_mode,
-            "select_number_of_polynomials": self.select_number_of_polynomials,
-            "select_polynomial_mode": self.select_polynomial_mode,
             "select_alpha_calc_mode": self.select_alpha_calc_mode,
+            "set_fit_mode": self.set_fit_mode,
+            "set_degree": self.set_degree,
+            "set_smoothing_factor": self.set_smoothing_factor,
         }
 
         # Initialize the menu bar
@@ -244,28 +249,6 @@ class App(customtkinter.CTk):
         self.logger.switch_logger_appearance(self.menu_bar.appearance_mode.get())
         self.graph.update_plot()
 
-    def select_number_of_polynomials(self) -> None:
-        """
-        Selects the number of polynomials to use.
-        """
-        self.logger.log_message(
-            "selected number of polynomials: "
-            + self.menu_bar.number_of_polynomials.get()
-            + " but not implemented yet!",
-            LogMessageType.INFO,
-        )
-
-    def select_polynomial_mode(self) -> None:
-        """
-        Selects the polynomial mode.
-        """
-        self.logger.log_message(
-            "Polynomials set to "
-            + self.menu_bar.polynomial_mode.get()
-            + " but not implemented yet!",
-            LogMessageType.ERROR,
-        )
-
     def select_alpha_calc_mode(self) -> None:
         """
         Selects the alpha calculation mode.
@@ -276,6 +259,31 @@ class App(customtkinter.CTk):
             + " but not implemented yet!",
             LogMessageType.ERROR,
         )
+
+    def set_fit_mode(self, mode: str) -> None:
+        """Switch between LSQ (smoothing_factor=None) and Smooth mode."""
+        if mode == "lsq":
+            self.smoothing_factor = None
+        else:
+            try:
+                self.smoothing_factor = float(self.menu_bar.smoothing_var.get())
+            except ValueError:
+                self.smoothing_factor = 1.0
+        self.graph.update_plot()
+        self.control_panel.recalculate()
+
+    def set_degree(self, degree: int) -> None:
+        """Set the B-spline degree and refresh."""
+        self.polynomial_degree = degree
+        self.graph.update_plot()
+        self.control_panel.recalculate()
+
+    def set_smoothing_factor(self, value: float) -> None:
+        """Set the smoothing factor, switch to Smooth mode, and refresh."""
+        self.smoothing_factor = value
+        self.menu_bar.fit_mode.set("smooth")
+        self.graph.update_plot()
+        self.control_panel.recalculate()
 
     def update_data_checkboxes(self) -> None:
         """

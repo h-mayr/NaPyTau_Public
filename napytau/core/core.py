@@ -12,14 +12,16 @@ from napytau.import_export.model.dataset import DataSet
 
 
 def calculate_lifetime_for_fit(
-    dataset: DataSet, polynomial_degree: int
+    dataset: DataSet,
+    polynomial_degree: int,
+    smoothing_factor: float | None = None,
 ) -> Tuple[float, float]:
     """
     Docstring missing. To be implemented with issue #44.
     """
     # Fit the spline and get coefficients + knot sequence
     coefficients, knots = calculate_polynomial_coefficients_for_fit(
-        dataset, polynomial_degree
+        dataset, polynomial_degree, smoothing_factor
     )
 
     # We now calculate the lifetimes tau_i for all measured distances
@@ -53,12 +55,13 @@ def calculate_optimal_tau_factor(
     t_hyp_range: Tuple[float, float],
     weight_factor: float,
     polynomial_degree: int,
+    smoothing_factor: float | None = None,
 ) -> float:
     """
     Docstring missing. To be implemented with issue #44.
     """
     coefficients, knots = calculate_polynomial_coefficients_for_fit(
-        dataset, polynomial_degree
+        dataset, polynomial_degree, smoothing_factor
     )
 
     optimal_t_hyp = optimize_tau_factor(
@@ -77,6 +80,7 @@ def calculate_lifetime_for_custom_tau_factor(
     dataset: DataSet,
     custom_tau_factor: float,
     polynomial_degree: int,
+    smoothing_factor: float | None = None,
 ) -> Tuple[float, float]:
     """
     Docstring missing. To be implemented with issue #44.
@@ -86,6 +90,7 @@ def calculate_lifetime_for_custom_tau_factor(
         dataset,
         custom_tau_factor,
         polynomial_degree,
+        smoothing_factor,
     )
 
     # We now calculate the lifetimes tau_i for all measured distances

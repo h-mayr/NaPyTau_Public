@@ -20,7 +20,7 @@ def set_up_mocks() -> (MagicMock, MagicMock, MagicMock, MagicMock):
     numpy_module_mock = MagicMock()
     numpy_module_mock.zeros = zeros_mock
     numpy_module_mock.diag = MagicMock()
-    numpy_module_mock.linalg.inv = MagicMock()
+    numpy_module_mock.linalg.pinv = MagicMock()
     numpy_module_mock.power = MagicMock()
 
     # used actual implementation as these are either data types or functions used for testing only
@@ -105,7 +105,7 @@ class DeltaTauUnitTests(unittest.TestCase):
         numpy_module_mock.diag.return_value = np.array(
             [[1 / 4, 0, 0], [0, 1 / 9, 0], [0, 0, 1 / 16]]
         )
-        numpy_module_mock.linalg.inv.return_value = np.array(
+        numpy_module_mock.linalg.pinv.return_value = np.array(
             [[-0.13826047, 0.41478141], [0.41478141, -1.24434423]]
         )
 
@@ -187,7 +187,7 @@ class DeltaTauUnitTests(unittest.TestCase):
         numpy_module_mock.diag.return_value = np.array(
             [[1 / 4, 0, 0], [0, 1 / 9, 0], [0, 0, 1 / 16]]
         )
-        numpy_module_mock.linalg.inv.return_value = np.array(
+        numpy_module_mock.linalg.pinv.return_value = np.array(
             [[-0.13826047, 0.41478141], [0.41478141, -1.24434423]]
         )
         numpy_module_mock.einsum = np.einsum

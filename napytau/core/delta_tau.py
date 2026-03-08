@@ -87,7 +87,7 @@ def calculate_covariance_matrix(
 
     fit_matrix: np.ndarray = jacobian_matrix.T @ weight_matrix @ jacobian_matrix
 
-    covariance_matrix: np.ndarray = np.linalg.inv(fit_matrix)
+    covariance_matrix: np.ndarray = np.linalg.pinv(fit_matrix)
 
     return covariance_matrix
 

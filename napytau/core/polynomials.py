@@ -3,7 +3,7 @@ from napytau.core.errors.polynomial_coefficient_error import (
 )
 import numpy as np
 import scipy as sp
-from scipy.interpolate import LSQUnivariateSpline, BSpline
+from scipy.interpolate import LSQUnivariateSpline, UnivariateSpline, BSpline
 
 from napytau.core.time import calculate_times_from_distances_and_relative_velocity
 from napytau.import_export.model.dataset import DataSet
@@ -66,42 +66,71 @@ def evaluate_differentiated_polynomial_at_measuring_times(
 def calculate_polynomial_coefficients_for_fit(
     dataset: DataSet,
     degree: int,
+    smoothing_factor: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Fits a B-spline to the dataset using LSQUnivariateSpline and returns
-    the B-spline coefficients and the full knot sequence.
+    Fits a B-spline to the dataset and returns the B-spline coefficients
+    and the full knot sequence.
 
-    Interior knots come from dataset.get_sampling_points().
+    When smoothing_factor is None (default), uses LSQUnivariateSpline with
+    interior knots from dataset.get_sampling_points().
+    When smoothing_factor is a float, uses UnivariateSpline which selects
+    knots automatically via the smoothing parameter s.
 
     Args:
         dataset (DataSet): The dataset of the experiment
         degree (int): The degree of the spline (k parameter)
+        smoothing_factor (float | None): If None, use LSQ mode; if float, use
+            UnivariateSpline with this smoothing parameter s.
 
     Returns:
         tuple[ndarray, ndarray]: (B-spline coefficients, full knot sequence)
     """
-    sampling_points = dataset.get_sampling_points()
-    if not sampling_points:
-        raise ValueError(
-            "dataset.sampling_points must be non-empty for LSQUnivariateSpline fitting."
-        )
-
     times: np.ndarray = calculate_times_from_distances_and_relative_velocity(dataset)
-    shifted_intensities = (
+    shifted_intensities = np.array(
         dataset.get_datapoints().get_shifted_intensities().get_values()
     )
-    interior_knots = np.array(sampling_points)
+
+    # Both spline variants require data sorted in ascending x order
+    sort_idx = np.argsort(times)
+    times = times[sort_idx]
+    shifted_intensities = shifted_intensities[sort_idx]
+
+    if smoothing_factor is not None:
+        spline = UnivariateSpline(
+            times, shifted_intensities, k=degree, s=smoothing_factor
+        )
+        full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
+        return np.asarray(coefficients), np.asarray(full_knots)
+
+    sampling_points = dataset.get_sampling_points()
+
+    # Interior knots must lie strictly inside (times[0], times[-1])
+    t_min, t_max = times[0], times[-1]
+    interior_knots = (
+        np.array(sorted(t for t in sampling_points if t_min < t < t_max))
+        if sampling_points
+        else np.array([])
+    )
+
+    if len(interior_knots) == 0:
+        # No valid knots: fall back to UnivariateSpline with automatic smoothing
+        spline = UnivariateSpline(times, shifted_intensities, k=degree)
+        full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
+        return np.asarray(coefficients), np.asarray(full_knots)
 
     spline = LSQUnivariateSpline(
         times, shifted_intensities, t=interior_knots, k=degree
     )
-    return spline.c, spline.t
+    full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
+    return np.asarray(coefficients), np.asarray(full_knots)
 
 
 def calculate_polynomial_coefficients_for_tau_factor(
     dataset: DataSet,
     tau_factor: float,
     degree: int,
+    smoothing_factor: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Finds B-spline coefficients such that P(t)/P'(t) = tau_factor at all
@@ -111,12 +140,14 @@ def calculate_polynomial_coefficients_for_tau_factor(
         dataset (DataSet): The dataset of the experiment
         tau_factor (float): The tau factor to be used in the spline fit
         degree (int): The degree of the spline
+        smoothing_factor (float | None): Passed to
+            calculate_polynomial_coefficients_for_fit.
 
     Returns:
         tuple[ndarray, ndarray]: (optimized B-spline coefficients, full knot sequence)
     """
     reference_coefficients, knots = calculate_polynomial_coefficients_for_fit(
-        dataset, degree
+        dataset, degree, smoothing_factor
     )
 
     times: np.ndarray = calculate_times_from_distances_and_relative_velocity(dataset)

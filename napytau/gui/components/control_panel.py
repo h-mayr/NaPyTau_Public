@@ -74,7 +74,8 @@ class ControlPanel(customtkinter.CTkFrame):
             3, weight=2
         )  # Entry field (More weight to make it bigger)
 
-        tau_factor = customtkinter.StringVar(value=str(self.timescale.get()))
+        self._tau_factor_var = customtkinter.StringVar(value=str(self.timescale.get()))
+        tau_factor = self._tau_factor_var
 
         def update_timescale() -> None:
             try:
@@ -86,9 +87,10 @@ class ControlPanel(customtkinter.CTkFrame):
                         f"Timescale set to: {value}", LogMessageType.INFO
                     )
                     lifetime = calculate_lifetime_for_custom_tau_factor(
-                        self.parent.datasets[0],
+                        self.parent.dataset[0],
                         value,
-                        int(self.parent.menu_bar.number_of_polynomials.get()),
+                        self.parent.polynomial_degree,
+                        self.parent.smoothing_factor,
                     )
 
                     self.result_tau.set(str(lifetime[0]))
@@ -115,7 +117,8 @@ class ControlPanel(customtkinter.CTkFrame):
                 lifetime = calculate_lifetime_for_custom_tau_factor(
                     coalesce(self.parent.dataset[0]),
                     value,
-                    int(self.parent.menu_bar.number_of_polynomials.get()),
+                    self.parent.polynomial_degree,
+                    self.parent.smoothing_factor,
                 )
 
                 self.result_tau.set(str(lifetime[0]))
@@ -304,14 +307,28 @@ class ControlPanel(customtkinter.CTkFrame):
         Event if the chi2 button is clicked.
         """
         if self._check_dataset_set():
-            self.set_result_chi_squared(
-                calculate_optimal_tau_factor(
-                    coalesce(self.parent.dataset[0]),
-                    (5, 100),
-                    1.0,
-                    int(self.parent.menu_bar.number_of_polynomials.get()),
-                )
+            optimal_tau = calculate_optimal_tau_factor(
+                coalesce(self.parent.dataset[0]),
+                (5, 100),
+                1.0,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
             )
+            self.set_result_chi_squared(optimal_tau)
+
+            # Update slider and entry field to the optimal tau factor
+            self.timescale.set(optimal_tau)
+            self._tau_factor_var.set(f"{optimal_tau:.2f}")
+
+            # Recalculate τ ± Δτ for the new tau factor
+            lifetime = calculate_lifetime_for_custom_tau_factor(
+                coalesce(self.parent.dataset[0]),
+                optimal_tau,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
+            )
+            self.result_tau.set(str(lifetime[0]))
+            self.result_tau_error.set(str(lifetime[1]))
 
     def _absolute_tau_button_event(self) -> None:
         """
@@ -363,7 +380,8 @@ class ControlPanel(customtkinter.CTkFrame):
             lifetime = calculate_lifetime_for_custom_tau_factor(
                 coalesce(self.parent.dataset[0]),
                 value,
-                int(self.parent.menu_bar.number_of_polynomials.get()),
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
             )
             self.result_tau.set(str(lifetime[0]))
             self.result_tau_error.set(str(lifetime[1]))

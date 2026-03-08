@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 import customtkinter
 import numpy as np
 import scipy
+from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
 
 from napytau.gui.components.toolbar import Toolbar
 from napytau.gui.model.color import Color
@@ -25,6 +26,8 @@ class Graph:
         self.parent = parent
         self._knot_mode: bool = False
         self._knot_distances: list[float] = []
+        self._axes1_yscale: str = "linear"
+        self._axes2_yscale: str = "linear"
         self.graph_frame = self.plot(customtkinter.get_appearance_mode())
         self.graph_frame.grid(
             row=1, column=0, rowspan=2, padx=(10, 10), pady=(10, 0), sticky="nsew"
@@ -60,6 +63,9 @@ class Graph:
             )
             ax.set_xscale("log")
 
+        axes_1.set_yscale(self._axes1_yscale)
+        axes_2.set_yscale(self._axes2_yscale)
+
         # hide x-tick labels on top axes (shared; bottom carries them)
         axes_1.tick_params(labelbottom=False)
 
@@ -68,7 +74,10 @@ class Graph:
         # draw unshifted markers + derivative curve on bottom axes
         self.plot_unshifted_markers(self.parent.datapoints_for_fitting, axes_2)
 
-        if len(self.parent.datapoints_for_fitting.get_active_datapoints()) > 0:
+        active = self.parent.datapoints_for_fitting.get_active_datapoints()
+        if len(active) > 0:
+            self._set_ylim_with_errors(axes_1, active, intensity_index=0)
+            self._set_ylim_with_errors(axes_2, active, intensity_index=1)
             self.plot_fitting_curve(self.parent.datapoints_for_fitting, axes_1)
             self.plot_derivative_curve(self.parent.datapoints_for_fitting, axes_2)
 
@@ -98,10 +107,33 @@ class Graph:
         """Toggle interactive knot placement mode on or off."""
         self._knot_mode = not self._knot_mode
 
+    def toggle_axes1_yscale(self) -> None:
+        """Switch top subplot y-axis between linear and log scale."""
+        self._axes1_yscale = "log" if self._axes1_yscale == "linear" else "linear"
+        self.parent.after(0, self.update_plot)
+
+    def toggle_axes2_yscale(self) -> None:
+        """Switch bottom subplot y-axis between linear and log scale."""
+        self._axes2_yscale = "log" if self._axes2_yscale == "linear" else "linear"
+        self.parent.after(0, self.update_plot)
+
     def clear_knots(self) -> None:
         """Remove all user-placed knots and clear dataset sampling_points."""
         self._knot_distances = []
         self.parent.dataset[0].set_sampling_points([])
+
+    def _set_ylim_with_errors(
+        self,
+        axes: Axes,
+        datapoints: DatapointCollection,
+        intensity_index: int,
+    ) -> None:
+        """Set y-axis limits to cover value ± error for all active datapoints."""
+        pairs = [dp.get_intensity()[intensity_index] for dp in datapoints]
+        y_lo = min(p.value - p.error for p in pairs)
+        y_hi = max(p.value + p.error for p in pairs)
+        pad = (y_hi - y_lo) * 0.1 if y_hi != y_lo else abs(y_hi) * 0.1 + 1.0
+        axes.set_ylim(y_lo - pad, y_hi + pad)
 
     def _plot_knot_lines(self, axes: Axes) -> None:
         """Draw a vertical dashed orange line for each knot distance."""
@@ -238,74 +270,79 @@ class Graph:
                 color=self.secondary_marker_color,
             )
 
-    def plot_fitting_curve(self, datapoints: DatapointCollection, axes: Axes) -> None:
+    def _fit_spline_for_display(
+        self,
+        distances: np.ndarray,
+        values: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """Fit a B-spline through (distances, values) using the current fit settings.
+
+        Returns (d_fit, y_fit) arrays for plotting, or None if fitting fails.
         """
-         plotting fitting curve of datapoints
-        :param x_data: x coordinates
-        :param y_data: y coordinates
-        :param axes: the axes on which to draw the fitting curve
-        :return: nothing
-        """
+        dataset = self.parent.dataset[0]
+        velocity = dataset.get_relative_velocity().value.get_velocity()
+        if velocity == 0:
+            return None
 
-        # Extracting distance values / intensities of checked datapoints
-        checked_datapoints: DatapointCollection = datapoints.get_active_datapoints()
+        c = scipy.constants.speed_of_light
+        times = distances / (velocity * c)
 
-        checked_distances: list[float] = [
-            valueErrorPair.value
-            for valueErrorPair in checked_datapoints.get_distances()
-        ]
+        sort_idx = np.argsort(times)
+        times_s = times[sort_idx]
+        values_s = values[sort_idx]
+        distances_s = distances[sort_idx]
 
-        checked_shifted_intensities: list[float] = [
-            valueErrorPair.value
-            for valueErrorPair in checked_datapoints.get_shifted_intensities()
-        ]
+        degree = self.parent.polynomial_degree
+        smoothing_factor = self.parent.smoothing_factor
+        sampling_points = dataset.get_sampling_points()
 
-        # Calculating coefficients
-        coeffs = np.polyfit(
-            checked_distances,
-            checked_shifted_intensities,
-            int(self.parent.menu_bar.number_of_polynomials.get()),
+        t_min, t_max = times_s[0], times_s[-1]
+        interior_knots = (
+            np.array(sorted(t for t in sampling_points if t_min < t < t_max))
+            if sampling_points
+            else np.array([])
         )
 
-        poly = np.poly1d(coeffs)  # Creating polynomial with given coefficients
+        try:
+            if smoothing_factor is not None:
+                spline = UnivariateSpline(
+                    times_s, values_s, k=degree, s=smoothing_factor
+                )
+            elif len(interior_knots) > 0:
+                spline = LSQUnivariateSpline(
+                    times_s, values_s, t=interior_knots, k=degree
+                )
+            else:
+                spline = UnivariateSpline(times_s, values_s, k=degree)
+        except Exception:
+            return None
 
-        x_fit = np.linspace(min(checked_distances), max(checked_distances), 100)
-        y_fit = poly(x_fit)
+        d_fit = np.linspace(distances_s[0], distances_s[-1], 300)
+        t_fit = d_fit / (velocity * c)
+        return d_fit, np.asarray(spline(t_fit))
 
-        # plot the curve
-        axes.plot(x_fit, y_fit, color="red", linestyle="--", linewidth="0.6")
+    def plot_fitting_curve(self, datapoints: DatapointCollection, axes: Axes) -> None:
+        """Plot the B-spline fit through shifted intensities on the given axes."""
+        active = datapoints.get_active_datapoints()
+        distances = np.array(active.get_distances().get_values())
+        shifted = np.array(active.get_shifted_intensities().get_values())
+
+        result = self._fit_spline_for_display(distances, shifted)
+        if result is None:
+            return
+        d_fit, y_fit = result
+        axes.plot(d_fit, y_fit, color="red", linestyle="--", linewidth=0.6)
 
     def plot_derivative_curve(
         self, datapoints: DatapointCollection, axes: Axes
     ) -> None:
-        """
-         plotting derivative curve of datapoints
-        :param x_data: x coordinates
-        :param y_data: y coordinates
-        :param axes: the axes on which to draw the fitting curve
-        :return: nothing
-        """
+        """Plot the B-spline fit through unshifted intensities on the given axes."""
+        active = datapoints.get_active_datapoints()
+        distances = np.array(active.get_distances().get_values())
+        unshifted = np.array(active.get_unshifted_intensities().get_values())
 
-        # Extracting distance values / intensities of checked datapoints
-        checked_datapoints: DatapointCollection = datapoints.get_active_datapoints()
-
-        checked_distances = checked_datapoints.get_distances().get_values()
-
-        checked_unshifted_intensities = (
-            checked_datapoints.get_unshifted_intensities().get_values()
-        )
-
-        # Calculating coefficients
-        coeffs = np.polyfit(
-            checked_distances,
-            checked_unshifted_intensities,
-            int(self.parent.menu_bar.number_of_polynomials.get()),
-        )
-
-        poly = np.poly1d(coeffs)  # Creating polynomial with given coefficients
-
-        x_fit = np.linspace(min(checked_distances), max(checked_distances), 100)
-        y_fit = poly(x_fit)
-
-        # plot the curve
-        axes.plot(x_fit, y_fit, color="blue", linestyle="-", linewidth="0.6")
+        result = self._fit_spline_for_display(distances, unshifted)
+        if result is None:
+            return
+        d_fit, y_fit = result
+        axes.plot(d_fit, y_fit, color="blue", linestyle="-", linewidth=0.6)
