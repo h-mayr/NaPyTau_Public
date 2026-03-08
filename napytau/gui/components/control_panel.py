@@ -7,7 +7,6 @@ from napytau.core.core import (
     calculate_optimal_tau_factor,
     calculate_lifetime_for_custom_tau_factor,
 )
-from napytau.util.coalesce import coalesce
 
 if TYPE_CHECKING:
     from napytau.gui.app import App  # Import only for the type checking.
@@ -87,15 +86,13 @@ class ControlPanel(customtkinter.CTkFrame):
                         f"Timescale set to: {value}", LogMessageType.INFO
                     )
                     lifetime = calculate_lifetime_for_custom_tau_factor(
-                        self.parent.dataset[0],
+                        self.parent.active_dataset,
                         value,
                         self.parent.polynomial_degree,
                         self.parent.smoothing_factor,
                     )
 
-                    self.result_tau.set(str(lifetime[0]))
-                    self.result_tau_error.set(str(lifetime[1]))
-
+                    self._apply_lifetime(lifetime)
                     self._tau_button_event(lifetime[0], lifetime[1])
 
                 else:
@@ -115,14 +112,13 @@ class ControlPanel(customtkinter.CTkFrame):
             if self._check_dataset_set():
                 tau_factor.set(f"{value:.2f}")
                 lifetime = calculate_lifetime_for_custom_tau_factor(
-                    coalesce(self.parent.dataset[0]),
+                    self.parent.active_dataset,
                     value,
                     self.parent.polynomial_degree,
                     self.parent.smoothing_factor,
                 )
 
-                self.result_tau.set(str(lifetime[0]))
-                self.result_tau_error.set(str(lifetime[1]))
+                self._apply_lifetime(lifetime)
 
         update_timescale_button = customtkinter.CTkButton(
             frame,
@@ -295,6 +291,18 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         self.timescale.set(round(float(value), 2))
 
+    def _apply_lifetime(self, lifetime: tuple[float, float]) -> None:
+        """Set τ ± Δτ display, logging an error if τ is negative."""
+        tau, delta_tau = lifetime
+        if tau < 0:
+            self.parent.logger.log_message(
+                f"Calculation error: τ = {tau:.4g} ps is negative.",
+                LogMessageType.ERROR,
+            )
+            return
+        self.result_tau.set(str(tau))
+        self.result_tau_error.set(str(delta_tau))
+
     def _tau_button_event(self, value: float, error: float) -> None:
         """
         Event if the tau button is clicked.
@@ -308,7 +316,7 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         if self._check_dataset_set():
             optimal_tau = calculate_optimal_tau_factor(
-                coalesce(self.parent.dataset[0]),
+                self.parent.active_dataset,
                 (5, 100),
                 1.0,
                 self.parent.polynomial_degree,
@@ -322,13 +330,12 @@ class ControlPanel(customtkinter.CTkFrame):
 
             # Recalculate τ ± Δτ for the new tau factor
             lifetime = calculate_lifetime_for_custom_tau_factor(
-                coalesce(self.parent.dataset[0]),
+                self.parent.active_dataset,
                 optimal_tau,
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
             )
-            self.result_tau.set(str(lifetime[0]))
-            self.result_tau_error.set(str(lifetime[1]))
+            self._apply_lifetime(lifetime)
 
     def _absolute_tau_button_event(self) -> None:
         """
@@ -378,13 +385,12 @@ class ControlPanel(customtkinter.CTkFrame):
         try:
             value = self.timescale.get()
             lifetime = calculate_lifetime_for_custom_tau_factor(
-                coalesce(self.parent.dataset[0]),
+                self.parent.active_dataset,
                 value,
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
             )
-            self.result_tau.set(str(lifetime[0]))
-            self.result_tau_error.set(str(lifetime[1]))
+            self._apply_lifetime(lifetime)
         except Exception as e:
             self.parent.logger.log_message(
                 f"Calculation failed: {e}", LogMessageType.ERROR

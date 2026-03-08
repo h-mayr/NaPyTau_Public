@@ -269,19 +269,21 @@ class App(customtkinter.CTk):
                 self.smoothing_factor = float(self.menu_bar.smoothing_var.get())
             except ValueError:
                 self.smoothing_factor = 1.0
-        self.graph.update_plot()
-        self.control_panel.recalculate()
+        self.after(0, self._refresh_graph_and_calculation)
 
     def set_degree(self, degree: int) -> None:
         """Set the B-spline degree and refresh."""
         self.polynomial_degree = degree
-        self.graph.update_plot()
-        self.control_panel.recalculate()
+        self.after(0, self._refresh_graph_and_calculation)
 
     def set_smoothing_factor(self, value: float) -> None:
         """Set the smoothing factor, switch to Smooth mode, and refresh."""
         self.smoothing_factor = value
         self.menu_bar.fit_mode.set("smooth")
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def _refresh_graph_and_calculation(self) -> None:
+        """Update the graph and recalculate τ (deferred so menus close first)."""
         self.graph.update_plot()
         self.control_panel.recalculate()
 
@@ -297,6 +299,16 @@ class App(customtkinter.CTk):
 
         self.checkbox_panel.update_data_checkboxes_fitting()
         self.checkbox_panel.update_data_checkboxes_calculation()
+
+    @property
+    def active_dataset(self) -> DataSet:
+        """Return a DataSet with only the active (checked) datapoints."""
+        ds = self.dataset[0]
+        return DataSet(
+            relative_velocity=ds.get_relative_velocity(),
+            datapoints=ds.get_datapoints().get_active_datapoints(),
+            sampling_points=ds.get_sampling_points(),
+        )
 
     def get_datapoints(self) -> DatapointCollection:
         """

@@ -1,5 +1,4 @@
 import unittest
-from random import random
 from unittest.mock import MagicMock, patch
 import numpy as np
 from napytau.import_export.model.datapoint_collection import DatapointCollection
@@ -18,14 +17,7 @@ def set_up_mocks() -> MagicMock:
 
 def _get_dataset_stub(datapoints: DatapointCollection) -> DataSet:
     return DataSet(
-        ValueErrorPair(RelativeVelocity(random()), RelativeVelocity(random())),
-        datapoints,
-    )
-
-
-def _get_dataset_stub(datapoints: DatapointCollection) -> DataSet:
-    return DataSet(
-        ValueErrorPair(RelativeVelocity(random()), RelativeVelocity(random())),
+        ValueErrorPair(RelativeVelocity(1 / 299792458), RelativeVelocity(0)),
         datapoints,
     )
 
@@ -68,8 +60,8 @@ class TauUnitTest(unittest.TestCase):
             )
             dataset = _get_dataset_stub(datapoints)
 
-            # Expected result
-            expected_tau: np.ndarray = np.array([3, 1.6666667])
+            # Expected result: I_us / Ṗ(t) = [6, 10] / [2, 6]
+            expected_tau: np.ndarray = np.array([3, 10 / 6])
 
             np.testing.assert_array_almost_equal(
                 calculate_tau_i_values(

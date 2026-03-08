@@ -46,6 +46,17 @@ class CustomToolbar(NavigationToolbar2Tk):
         self._knot_button.pack(side=tk.LEFT, padx=2)
 
         # Y-scale toggle buttons for each subplot
+        self._ytau_button = tk.Button(
+            self,
+            text=f"Yτ: {parent.graph._axes_tau_yscale}",
+            bg="green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_ytau_scale,
+        )
+        self._ytau_button.pack(side=tk.LEFT, padx=2)
+
         self._y1_button = tk.Button(
             self,
             text=f"Y₁: {parent.graph._axes1_yscale}",
@@ -67,6 +78,10 @@ class CustomToolbar(NavigationToolbar2Tk):
             command=self._toggle_y2_scale,
         )
         self._y2_button.pack(side=tk.LEFT, padx=2)
+
+    def _toggle_ytau_scale(self) -> None:
+        self._app.graph.toggle_axes_tau_yscale()
+        self._ytau_button.config(text=f"Yτ: {self._app.graph._axes_tau_yscale}")
 
     def _toggle_knot_mode(self) -> None:
         self._app.graph.toggle_knot_mode()

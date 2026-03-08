@@ -14,6 +14,9 @@ from napytau.gui.model.color import Color
 from napytau.gui.model.marker_factory import generate_marker
 from napytau.gui.model.marker_factory import generate_error_marker_path
 
+from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
+from napytau.core.tau import calculate_tau_i_values
+from napytau.core.delta_tau import calculate_error_propagation_terms
 from napytau.import_export.model.datapoint_collection import DatapointCollection
 
 
@@ -26,6 +29,7 @@ class Graph:
         self.parent = parent
         self._knot_mode: bool = False
         self._knot_distances: list[float] = []
+        self._axes_tau_yscale: str = "linear"
         self._axes1_yscale: str = "linear"
         self._axes2_yscale: str = "linear"
         self.graph_frame = self.plot(customtkinter.get_appearance_mode())
@@ -40,20 +44,22 @@ class Graph:
             figsize=(3, 4), dpi=100, facecolor=Color.WHITE, edgecolor=Color.BLACK
         )
 
-        # adding two stacked subplots sharing the x-axis
-        axes_1 = fig.add_subplot(211)
-        axes_2 = fig.add_subplot(212, sharex=axes_1)
+        # three stacked subplots sharing the x-axis: τᵢ on top, shifted, unshifted
+        axes_tau = fig.add_subplot(311)
+        axes_1 = fig.add_subplot(312, sharex=axes_tau)
+        axes_2 = fig.add_subplot(313, sharex=axes_tau)
         fig.subplots_adjust(left=0.1, bottom=0.07, right=0.9, top=0.95, hspace=0.08)
 
         # set colors according to appearance mode
         self.set_colors(appearance)
 
-        # apply colors onto figure and both axes
+        # apply colors onto all three axes
+        self.apply_coloring(fig, axes_tau)
         self.apply_coloring(fig, axes_1)
         self.apply_coloring(fig, axes_2)
 
-        # add grid style to both axes
-        for ax in (axes_1, axes_2):
+        # add grid style to all three axes
+        for ax in (axes_tau, axes_1, axes_2):
             ax.grid(
                 True,
                 which="both",
@@ -63,13 +69,17 @@ class Graph:
             )
             ax.set_xscale("log")
 
+        axes_tau.set_yscale(self._axes_tau_yscale)
         axes_1.set_yscale(self._axes1_yscale)
         axes_2.set_yscale(self._axes2_yscale)
 
-        # hide x-tick labels on top axes (shared; bottom carries them)
+        # hide x-tick labels on upper two axes (shared; bottom carries them)
+        axes_tau.tick_params(labelbottom=False)
         axes_1.tick_params(labelbottom=False)
 
-        # draw shifted markers + fitting curve on top axes
+        # draw tau markers on top axes
+        self.plot_tau_values(axes_tau)
+        # draw shifted markers + fitting curve on middle axes
         self.plot_shifted_markers(self.parent.datapoints_for_fitting, axes_1)
         # draw unshifted markers + derivative curve on bottom axes
         self.plot_unshifted_markers(self.parent.datapoints_for_fitting, axes_2)
@@ -81,7 +91,8 @@ class Graph:
             self.plot_fitting_curve(self.parent.datapoints_for_fitting, axes_1)
             self.plot_derivative_curve(self.parent.datapoints_for_fitting, axes_2)
 
-        # draw knot markers on both axes
+        # draw knot markers on all three axes
+        self._plot_knot_lines(axes_tau)
         self._plot_knot_lines(axes_1)
         self._plot_knot_lines(axes_2)
 
@@ -269,6 +280,46 @@ class Graph:
                 label=f"Point {index + 1}",
                 color=self.secondary_marker_color,
             )
+
+    def toggle_axes_tau_yscale(self) -> None:
+        """Switch top (τ) subplot y-axis between linear and log scale."""
+        self._axes_tau_yscale = "log" if self._axes_tau_yscale == "linear" else "linear"
+        self.parent.after(0, self.update_plot)
+
+    def plot_tau_values(self, axes: Axes) -> None:
+        """Plot per-datapoint τᵢ ± Δτᵢ values vs distances on the given axes."""
+        dataset = self.parent.active_dataset
+        try:
+            tau_factor = (
+                self.parent.control_panel.timescale.get()
+                if hasattr(self.parent, "control_panel")
+                else 0.0
+            )
+            coefficients, knots = calculate_polynomial_coefficients_for_fit(
+                dataset,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
+            )
+            tau_i = calculate_tau_i_values(
+                dataset, coefficients, knots, self.parent.polynomial_degree
+            )
+            delta_tau_i = calculate_error_propagation_terms(
+                dataset, coefficients, tau_factor, knots, self.parent.polynomial_degree
+            )
+            distances = np.array(dataset.get_datapoints().get_distances().get_values())
+            axes.errorbar(
+                distances,
+                tau_i,
+                yerr=delta_tau_i,
+                fmt="o",
+                markersize=4,
+                color=self.main_marker_color,
+                ecolor=self.main_marker_color,
+                capsize=2,
+                linewidth=0.8,
+            )
+        except Exception:
+            pass
 
     def _fit_spline_for_display(
         self,
