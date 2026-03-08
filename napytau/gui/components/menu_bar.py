@@ -45,7 +45,7 @@ class MenuBar(customtkinter.CTkFrame):
         # Setting up default values
         self.appearance_mode = tk.StringVar(value="system")
         self.alpha_calc_mode = tk.StringVar(value="sum ratio")
-        self.mode = tk.StringVar(value=IMPORT_FORMAT_NAPYTAU)
+        self.mode = tk.StringVar(value=IMPORT_FORMAT_LEGACY)
         self.mode.trace_add("write", self.on_mode_change)
         self.fit_mode = tk.StringVar(value="lsq")
         self.degree_var = tk.StringVar(value=str(parent.polynomial_degree))
@@ -206,6 +206,12 @@ class MenuBar(customtkinter.CTkFrame):
             value="smooth",
             command=self._on_fit_mode_change,
         )
+        self.fit_menu.add_radiobutton(
+            label="Coupled (shifted+unshifted)",
+            variable=self.fit_mode,
+            value="coupled",
+            command=self._on_fit_mode_change,
+        )
 
         self.fit_menu.add_separator()
 
@@ -235,8 +241,55 @@ class MenuBar(customtkinter.CTkFrame):
         smooth_menu.add_separator()
         smooth_menu.add_command(label="Custom…", command=self._on_smoothing_custom)
 
+        self.fit_menu.add_separator()
+
+        # Knot spacing submenu
+        self.knot_spacing_var = tk.StringVar(value="manual")
+        knot_menu = tk.Menu(self.fit_menu, tearoff=0)
+        self.fit_menu.add_cascade(label="Knot Spacing", menu=knot_menu)
+        for label, value in [
+            ("Manual", "manual"),
+            ("Equidistant", "equidistant"),
+            ("Logarithmic", "log"),
+        ]:
+            knot_menu.add_radiobutton(
+                label=label,
+                variable=self.knot_spacing_var,
+                value=value,
+                command=self._on_knot_spacing_change,
+            )
+        knot_menu.add_separator()
+        knot_menu.add_command(label="Number of knots…", command=self._ask_n_knots)
+
+        self.fit_menu.add_separator()
+
+        # Monte Carlo iterations
+        self.fit_menu.add_command(
+            label="MC Iterations…", command=self._ask_mc_iterations
+        )
+
     def _on_fit_mode_change(self) -> None:
         self.callbacks["set_fit_mode"](self.fit_mode.get())
+
+    def _on_knot_spacing_change(self) -> None:
+        self.callbacks["set_knot_spacing_mode"](self.knot_spacing_var.get())
+
+    def _ask_n_knots(self) -> None:
+        value = simpledialog.askinteger(
+            "Knots", "Number of interior knots:", minvalue=1, maxvalue=20
+        )
+        if value is not None:
+            self.callbacks["set_n_auto_knots"](value)
+
+    def _ask_mc_iterations(self) -> None:
+        value = simpledialog.askinteger(
+            "Monte Carlo",
+            "Number of MC iterations (0 = disabled):",
+            minvalue=0,
+            maxvalue=10000,
+        )
+        if value is not None:
+            self.callbacks["set_n_mc_iterations"](value)
 
     def _on_degree_change(self) -> None:
         self.callbacks["set_degree"](int(self.degree_var.get()))

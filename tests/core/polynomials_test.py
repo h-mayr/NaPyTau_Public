@@ -275,5 +275,45 @@ class PolynomialsUnitTest(unittest.TestCase):
         mock_lsq.assert_not_called()
 
 
+    def test_CoupledFitReturnsCoefficientsAndKnots(self):
+        """calculate_polynomial_coefficients_for_coupled_fit returns valid (coefficients, knots)."""
+        from napytau.core.polynomials import (
+            calculate_polynomial_coefficients_for_coupled_fit,
+        )
+
+        datapoints = DatapointCollection(
+            [
+                Datapoint(
+                    ValueErrorPair(0.0, 0.16),
+                    None,
+                    ValueErrorPair(10.0, 1.0),
+                    ValueErrorPair(3.0, 0.5),
+                ),
+                Datapoint(
+                    ValueErrorPair(1.0, 0.16),
+                    None,
+                    ValueErrorPair(8.0, 1.0),
+                    ValueErrorPair(2.5, 0.5),
+                ),
+                Datapoint(
+                    ValueErrorPair(2.0, 0.16),
+                    None,
+                    ValueErrorPair(6.0, 1.0),
+                    ValueErrorPair(2.0, 0.5),
+                ),
+            ]
+        )
+        dataset = _get_dataset_stub(datapoints)
+        coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
+            dataset, tau_factor=2.0, degree=2
+        )
+
+        self.assertIsInstance(coefficients, np.ndarray)
+        self.assertIsInstance(knots, np.ndarray)
+        self.assertGreater(len(coefficients), 0)
+        # n_coeffs = len(knots) - degree - 1
+        self.assertEqual(len(coefficients), len(knots) - 2 - 1)
+
+
 if __name__ == "__main__":
     unittest.main()

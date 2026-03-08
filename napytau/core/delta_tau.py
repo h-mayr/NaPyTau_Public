@@ -1,10 +1,16 @@
 from napytau.core.polynomials import (
+    calculate_polynomial_coefficients_for_coupled_fit,
+    calculate_polynomial_coefficients_for_fit,
     evaluate_differentiated_polynomial_at_measuring_times,
     evaluate_polynomial_at_measuring_times,
 )
 import numpy as np
+from numpy.random import Generator
 
+from napytau.import_export.model.datapoint import Datapoint
+from napytau.import_export.model.datapoint_collection import DatapointCollection
 from napytau.import_export.model.dataset import DataSet
+from napytau.util.model.value_error_pair import ValueErrorPair
 
 
 def calculate_jacobian_matrix(
@@ -164,3 +170,86 @@ def calculate_error_propagation_terms(
     errors: np.ndarray = interim_result + error_from_covariance
     # Return the sum of all three contributions
     return errors
+
+
+def _perturb_dataset(dataset: DataSet, rng: Generator) -> DataSet:
+    """Return a copy of dataset with intensities perturbed by N(0, sigma)."""
+    perturbed_points: list[Datapoint] = []
+    for dp in dataset.get_datapoints():
+        sh, us = dp.get_intensity()
+        new_sh = rng.normal(sh.value, abs(sh.error))
+        new_us = rng.normal(us.value, abs(us.error))
+        new_dp = Datapoint(
+            distance=dp.distance,
+            calibration=dp.calibration,
+            shifted_intensity=ValueErrorPair(float(new_sh), sh.error),
+            unshifted_intensity=ValueErrorPair(float(new_us), us.error),
+            feeding_shifted_intensity=dp.feeding_shifted_intensity,
+            feeding_unshifted_intensity=dp.feeding_unshifted_intensity,
+            active=dp.active,
+        )
+        perturbed_points.append(new_dp)
+    return DataSet(
+        relative_velocity=dataset.get_relative_velocity(),
+        datapoints=DatapointCollection(perturbed_points),
+        sampling_points=dataset.get_sampling_points(),
+    )
+
+
+def calculate_error_propagation_mc(
+    dataset: DataSet,
+    degree: int,
+    smoothing_factor: float | None,
+    fit_mode: str,
+    n_iterations: int = 100,
+) -> tuple[float, float]:
+    """
+    Returns (tau_final, sigma_tau) estimated via Monte Carlo resampling.
+
+    For each iteration:
+      1. Perturb I_sh[i] ~ N(I_sh[i], σ_sh[i]) and I_us[i] ~ N(I_us[i], σ_us[i])
+      2. Refit and compute weighted-mean τ_final
+    Final sigma = std of the τ_final distribution.
+
+    Args:
+        dataset (DataSet): The dataset of the experiment
+        degree (int): B-spline degree
+        smoothing_factor (float | None): Smoothing factor (None = LSQ mode)
+        fit_mode (str): "lsq", "smooth", or "coupled"
+        n_iterations (int): Number of Monte Carlo samples
+
+    Returns:
+        tuple[float, float]: (mean tau_final, std of tau_final distribution)
+    """
+    from napytau.core.tau import calculate_tau_i_values
+    from napytau.core.tau_final import calculate_tau_final
+
+    rng = np.random.default_rng()
+    tau_samples: list[float] = []
+
+    for _ in range(n_iterations):
+        perturbed = _perturb_dataset(dataset, rng)
+        try:
+            if fit_mode == "coupled":
+                coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
+                    perturbed, 1.0, degree
+                )
+            else:
+                coefficients, knots = calculate_polynomial_coefficients_for_fit(
+                    perturbed, degree, smoothing_factor
+                )
+            tau_i = calculate_tau_i_values(perturbed, coefficients, knots, degree)
+            delta_tau_i = calculate_error_propagation_terms(
+                perturbed, coefficients, 0.0, knots, degree
+            )
+            tau_mc, _ = calculate_tau_final(tau_i, delta_tau_i)
+            if np.isfinite(tau_mc) and tau_mc != -1:
+                tau_samples.append(tau_mc)
+        except Exception:
+            continue
+
+    if len(tau_samples) == 0:
+        return -1.0, -1.0
+
+    arr = np.array(tau_samples)
+    return float(np.mean(arr)), float(np.std(arr))

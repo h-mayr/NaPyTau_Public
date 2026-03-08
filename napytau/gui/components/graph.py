@@ -14,7 +14,10 @@ from napytau.gui.model.color import Color
 from napytau.gui.model.marker_factory import generate_marker
 from napytau.gui.model.marker_factory import generate_error_marker_path
 
-from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
+from napytau.core.polynomials import (
+    calculate_polynomial_coefficients_for_coupled_fit,
+    calculate_polynomial_coefficients_for_fit,
+)
 from napytau.core.tau import calculate_tau_i_values
 from napytau.core.delta_tau import calculate_error_propagation_terms
 from napytau.import_export.model.datapoint_collection import DatapointCollection
@@ -144,7 +147,10 @@ class Graph:
         y_lo = min(p.value - p.error for p in pairs)
         y_hi = max(p.value + p.error for p in pairs)
         pad = (y_hi - y_lo) * 0.1 if y_hi != y_lo else abs(y_hi) * 0.1 + 1.0
-        axes.set_ylim(y_lo - pad, y_hi + pad)
+        lo = y_lo - pad
+        if axes.get_yscale() == "log":
+            lo = max(lo, 1e-10)
+        axes.set_ylim(lo, y_hi + pad)
 
     def _plot_knot_lines(self, axes: Axes) -> None:
         """Draw a vertical dashed orange line for each knot distance."""
@@ -295,11 +301,19 @@ class Graph:
                 if hasattr(self.parent, "control_panel")
                 else 0.0
             )
-            coefficients, knots = calculate_polynomial_coefficients_for_fit(
-                dataset,
-                self.parent.polynomial_degree,
-                self.parent.smoothing_factor,
-            )
+            fit_mode = getattr(self.parent, "fit_mode", "lsq")
+            if fit_mode == "coupled":
+                coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
+                    dataset,
+                    tau_factor if tau_factor > 0 else 1.0,
+                    self.parent.polynomial_degree,
+                )
+            else:
+                coefficients, knots = calculate_polynomial_coefficients_for_fit(
+                    dataset,
+                    self.parent.polynomial_degree,
+                    self.parent.smoothing_factor,
+                )
             tau_i = calculate_tau_i_values(
                 dataset, coefficients, knots, self.parent.polynomial_degree
             )
@@ -344,7 +358,11 @@ class Graph:
         distances_s = distances[sort_idx]
 
         degree = self.parent.polynomial_degree
-        smoothing_factor = self.parent.smoothing_factor
+        fit_mode = getattr(self.parent, "fit_mode", "lsq")
+        # For coupled mode, display a regular LSQ spline (coupled fit is for τ calc)
+        smoothing_factor = (
+            None if fit_mode == "coupled" else self.parent.smoothing_factor
+        )
         sampling_points = dataset.get_sampling_points()
 
         t_min, t_max = times_s[0], times_s[-1]

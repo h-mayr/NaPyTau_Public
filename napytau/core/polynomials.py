@@ -126,6 +126,84 @@ def calculate_polynomial_coefficients_for_fit(
     return np.asarray(coefficients), np.asarray(full_knots)
 
 
+def calculate_polynomial_coefficients_for_coupled_fit(
+    dataset: DataSet,
+    tau_factor: float,
+    degree: int,
+    weight_factor: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Fits B-spline coefficients using a coupled system where both shifted and
+    unshifted intensities enter the normal equations with tau_factor as a
+    parameter (mirrors the Perl napatau calc_fit routine).
+
+    Args:
+        dataset (DataSet): The dataset of the experiment
+        tau_factor (float): Current tau factor estimate
+        degree (int): Degree of the B-spline
+        weight_factor (float): Weight for unshifted contribution (default 1.0)
+
+    Returns:
+        tuple[ndarray, ndarray]: (B-spline coefficients, full knot sequence)
+    """
+    times: np.ndarray = calculate_times_from_distances_and_relative_velocity(dataset)
+    datapoints = dataset.get_datapoints()
+
+    i_sh = np.array(datapoints.get_shifted_intensities().get_values())
+    sigma_sh = np.array(datapoints.get_shifted_intensities().get_errors())
+    i_us = np.array(datapoints.get_unshifted_intensities().get_values())
+    sigma_us = np.array(datapoints.get_unshifted_intensities().get_errors())
+
+    sort_idx = np.argsort(times)
+    times = times[sort_idx]
+    i_sh = i_sh[sort_idx]
+    sigma_sh = sigma_sh[sort_idx]
+    i_us = i_us[sort_idx]
+    sigma_us = sigma_us[sort_idx]
+
+    sampling_points = dataset.get_sampling_points()
+    t_min, t_max = times[0], times[-1]
+    interior_knots = (
+        np.array(sorted(t for t in sampling_points if t_min < t < t_max))
+        if sampling_points
+        else np.array([])
+    )
+
+    if len(interior_knots) == 0:
+        ref_spline = UnivariateSpline(times, i_sh, k=degree)
+        full_knots, _, _ = ref_spline._eval_args  # type: ignore[misc]
+        knots = np.asarray(full_knots)
+    else:
+        ref_spline = LSQUnivariateSpline(times, i_sh, t=interior_knots, k=degree)
+        full_knots, _, _ = ref_spline._eval_args  # type: ignore[misc]
+        knots = np.asarray(full_knots)
+
+    n = len(times)
+    n_coeffs = len(knots) - degree - 1
+
+    b_matrix = np.zeros((n, n_coeffs))
+    db_matrix = np.zeros((n, n_coeffs))
+    for j in range(n_coeffs):
+        e_j = np.zeros(n_coeffs)
+        e_j[j] = 1.0
+        spl = BSpline(knots, e_j, degree)
+        b_matrix[:, j] = np.asarray(spl(times))
+        db_matrix[:, j] = np.asarray(spl.derivative()(times))
+
+    fac1 = (2.0 - weight_factor) / sigma_sh**2
+    fac2 = weight_factor * tau_factor / sigma_us**2
+
+    a_matrix = (
+        b_matrix.T @ np.diag(fac1) @ b_matrix
+        + db_matrix.T @ np.diag(fac2 * tau_factor) @ db_matrix
+    )
+    y_vector = b_matrix.T @ (fac1 * i_sh) + db_matrix.T @ (fac2 * i_us)
+
+    coefficients, _, _, _ = np.linalg.lstsq(a_matrix, y_vector, rcond=None)
+
+    return np.asarray(coefficients), knots
+
+
 def calculate_polynomial_coefficients_for_tau_factor(
     dataset: DataSet,
     tau_factor: float,

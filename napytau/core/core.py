@@ -1,5 +1,6 @@
 from napytau.core.chi import optimize_tau_factor
 from napytau.core.polynomials import (
+    calculate_polynomial_coefficients_for_coupled_fit,
     calculate_polynomial_coefficients_for_fit,
     calculate_polynomial_coefficients_for_tau_factor,
 )
@@ -15,14 +16,20 @@ def calculate_lifetime_for_fit(
     dataset: DataSet,
     polynomial_degree: int,
     smoothing_factor: float | None = None,
+    fit_mode: str = "lsq",
 ) -> Tuple[float, float]:
     """
     Docstring missing. To be implemented with issue #44.
     """
     # Fit the spline and get coefficients + knot sequence
-    coefficients, knots = calculate_polynomial_coefficients_for_fit(
-        dataset, polynomial_degree, smoothing_factor
-    )
+    if fit_mode == "coupled":
+        coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
+            dataset, 1.0, polynomial_degree
+        )
+    else:
+        coefficients, knots = calculate_polynomial_coefficients_for_fit(
+            dataset, polynomial_degree, smoothing_factor
+        )
 
     # We now calculate the lifetimes tau_i for all measured distances
     tau_i_values: np.ndarray = calculate_tau_i_values(
@@ -56,6 +63,8 @@ def calculate_optimal_tau_factor(
     weight_factor: float,
     polynomial_degree: int,
     smoothing_factor: float | None = None,
+    fit_mode: str = "lsq",
+    initial_guess: float | None = None,
 ) -> float:
     """
     Docstring missing. To be implemented with issue #44.
@@ -71,6 +80,8 @@ def calculate_optimal_tau_factor(
         t_hyp_range,
         knots,
         polynomial_degree,
+        fit_mode=fit_mode,
+        initial_guess=initial_guess,
     )
 
     return optimal_t_hyp
@@ -81,17 +92,23 @@ def calculate_lifetime_for_custom_tau_factor(
     custom_tau_factor: float,
     polynomial_degree: int,
     smoothing_factor: float | None = None,
+    fit_mode: str = "lsq",
 ) -> Tuple[float, float]:
     """
     Docstring missing. To be implemented with issue #44.
     """
-    # Find spline coefficients such that P(t)/P'(t) = custom_tau_factor
-    coefficients, knots = calculate_polynomial_coefficients_for_tau_factor(
-        dataset,
-        custom_tau_factor,
-        polynomial_degree,
-        smoothing_factor,
-    )
+    if fit_mode == "coupled":
+        coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
+            dataset, custom_tau_factor, polynomial_degree
+        )
+    else:
+        # Find spline coefficients such that P(t)/P'(t) = custom_tau_factor
+        coefficients, knots = calculate_polynomial_coefficients_for_tau_factor(
+            dataset,
+            custom_tau_factor,
+            polynomial_degree,
+            smoothing_factor,
+        )
 
     # We now calculate the lifetimes tau_i for all measured distances
     tau_i_values: np.ndarray = calculate_tau_i_values(

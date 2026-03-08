@@ -62,13 +62,13 @@ class ControlPanel(customtkinter.CTkFrame):
         Create the timescale widget.
         """
 
-        timescale_min = 0.01
-        timescale_max = 100.0
+        self.timescale_min = 0.01
+        self.timescale_max = 10000.0
 
         frame = customtkinter.CTkFrame(self)
         frame.columnconfigure(0, weight=1)  # Button "t [ps]"
-        frame.columnconfigure(1, weight=1)  # Button "+0.1[ps]"
-        frame.columnconfigure(2, weight=1)  # Button "-0.1[ps]"
+        frame.columnconfigure(1, weight=1)  # Button "+5%"
+        frame.columnconfigure(2, weight=1)  # Button "-5%"
         frame.columnconfigure(
             3, weight=2
         )  # Entry field (More weight to make it bigger)
@@ -80,7 +80,7 @@ class ControlPanel(customtkinter.CTkFrame):
             try:
                 value = float(tau_factor.get())
 
-                if timescale_min <= value <= timescale_max:
+                if self.timescale_min <= value <= self.timescale_max:
                     self.timescale.set(value)
                     self.parent.logger.log_message(
                         f"Timescale set to: {value}", LogMessageType.INFO
@@ -90,6 +90,7 @@ class ControlPanel(customtkinter.CTkFrame):
                         value,
                         self.parent.polynomial_degree,
                         self.parent.smoothing_factor,
+                        fit_mode=self.parent.fit_mode,
                     )
 
                     self._apply_lifetime(lifetime)
@@ -97,8 +98,8 @@ class ControlPanel(customtkinter.CTkFrame):
 
                 else:
                     self.parent.logger.log_message(
-                        f"Error: Value out of valid range ({timescale_min:.2f}"
-                        f" - {timescale_max:.2f}).",
+                        f"Error: Value out of valid range ({self.timescale_min:.2f}"
+                        f" - {self.timescale_max:.2f}).",
                         LogMessageType.ERROR,
                     )
             except ValueError:
@@ -116,6 +117,7 @@ class ControlPanel(customtkinter.CTkFrame):
                     value,
                     self.parent.polynomial_degree,
                     self.parent.smoothing_factor,
+                    fit_mode=self.parent.fit_mode,
                 )
 
                 self._apply_lifetime(lifetime)
@@ -128,26 +130,28 @@ class ControlPanel(customtkinter.CTkFrame):
         )
         update_timescale_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
-        # Function for adding and subtracting from tau factor in 0.1ps steps
+        # Function for adding and subtracting from tau factor in ±5% steps
 
         add_on_tau_factor = (
-            lambda value: tau_factor.set(f"{float(tau_factor.get()) + value:.2f}")
-            if float(tau_factor.get()) + value >= 0.0
+            lambda pct: tau_factor.set(
+                f"{float(tau_factor.get()) * (1.0 + pct):.4g}"
+            )
+            if float(tau_factor.get()) * (1.0 + pct) >= self.timescale_min
             else None
         )
 
         # Create buttons for adding and subtracting
         add_taufactor_button = customtkinter.CTkButton(
             frame,
-            text="+0.1[ps]",
-            command=lambda: add_on_tau_factor(0.1),
+            text="+5%",
+            command=lambda: add_on_tau_factor(0.05),
             width=10,
         )
 
         subtract_taufactor_button = customtkinter.CTkButton(
             frame,
-            text="-0.1[ps]",
-            command=lambda: add_on_tau_factor(-0.1),
+            text="-5%",
+            command=lambda: add_on_tau_factor(-0.05),
             width=10,
         )
 
@@ -158,8 +162,8 @@ class ControlPanel(customtkinter.CTkFrame):
 
         slider = customtkinter.CTkSlider(
             frame,
-            from_=timescale_min,
-            to=timescale_max,
+            from_=self.timescale_min,
+            to=self.timescale_max,
             variable=self.timescale,
             command=sync_slider,
         )
@@ -317,10 +321,12 @@ class ControlPanel(customtkinter.CTkFrame):
         if self._check_dataset_set():
             optimal_tau = calculate_optimal_tau_factor(
                 self.parent.active_dataset,
-                (5, 100),
+                (self.timescale_min, self.timescale_max),
                 1.0,
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
+                initial_guess=self.timescale.get(),
             )
             self.set_result_chi_squared(optimal_tau)
 
@@ -334,6 +340,7 @@ class ControlPanel(customtkinter.CTkFrame):
                 optimal_tau,
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
             )
             self._apply_lifetime(lifetime)
 
@@ -389,6 +396,7 @@ class ControlPanel(customtkinter.CTkFrame):
                 value,
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
             )
             self._apply_lifetime(lifetime)
         except Exception as e:

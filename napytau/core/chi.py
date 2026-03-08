@@ -1,4 +1,5 @@
 from napytau.core.polynomials import (
+    calculate_polynomial_coefficients_for_coupled_fit,
     evaluate_differentiated_polynomial_at_measuring_times,
     evaluate_polynomial_at_measuring_times,
 )
@@ -57,7 +58,11 @@ def calculate_chi_squared(
         + (weight_factor * (np.power(unshifted_intensity_difference, 2)))
     )
 
-    return result
+    # Reduce by degrees of freedom so a perfect fit gives χ²_red ≈ 1
+    n_data = len(shifted_intensity_difference)
+    n_terms = n_data * (1 + int(weight_factor > 0))
+    dof = max(n_terms - len(coefficients), 1)
+    return result / dof
 
 
 def optimize_tau_factor(
@@ -67,6 +72,8 @@ def optimize_tau_factor(
     tau_factor_range: Tuple[float, float],
     knots: np.ndarray,
     degree: int,
+    fit_mode: str = "lsq",
+    initial_guess: float | None = None,
 ) -> float:
     """
     Optimizes the hypothesis value t_hyp to minimize the chi-squared function.
@@ -78,22 +85,34 @@ def optimize_tau_factor(
         tau_factor_range (tuple): Range for hypothesis optimization (min, max)
         knots (ndarray): Full B-spline knot sequence
         degree (int): Degree of the B-spline
+        fit_mode (str): "lsq", "smooth", or "coupled"
 
     Returns:
         float: Optimized t_hyp value.
     """
+
+    def _objective(t_hyp: np.ndarray) -> float:
+        tau = float(t_hyp[0]) if hasattr(t_hyp, "__len__") else float(t_hyp)
+        if fit_mode == "coupled":
+            c, k = calculate_polynomial_coefficients_for_coupled_fit(
+                dataset, tau, degree
+            )
+        else:
+            c, k = coefficients, knots
+        return calculate_chi_squared(dataset, c, tau, weight_factor, k, degree)
+
+    # Use provided guess; fall back to geometric mean (better than arithmetic
+    # mean when the range spans multiple orders of magnitude).
+    x0_val = (
+        initial_guess
+        if initial_guess is not None
+        else float(np.sqrt(tau_factor_range[0] * tau_factor_range[1]))
+    )
+    x0_val = float(np.clip(x0_val, tau_factor_range[0], tau_factor_range[1]))
+
     result: sp.optimize.OptimizeResult = sp.optimize.minimize(
-        lambda t_hyp: calculate_chi_squared(
-            dataset,
-            coefficients,
-            t_hyp,
-            weight_factor,
-            knots,
-            degree,
-        ),
-        # Initial guess for t_hyp. Starting with the mean reduces likelihood of
-        # biasing the optimization process toward one boundary.
-        x0=np.ndarray(shape=(1,), buffer=np.array([np.mean(tau_factor_range)])),
+        _objective,
+        x0=np.ndarray(shape=(1,), buffer=np.array([x0_val])),
         bounds=[(tau_factor_range[0], tau_factor_range[1])],
     )
 
