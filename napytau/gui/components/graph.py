@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 import customtkinter
 import numpy as np
 import scipy
-from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
+from scipy.interpolate import make_lsq_spline, make_splrep
 
 from napytau.gui.components.toolbar import Toolbar
 from napytau.gui.model.color import Color
@@ -374,15 +374,18 @@ class Graph:
 
         try:
             if smoothing_factor is not None:
-                spline = UnivariateSpline(
-                    times_s, values_s, k=degree, s=smoothing_factor
-                )
+                spline = make_splrep(times_s, values_s, k=degree, s=smoothing_factor)
             elif len(interior_knots) > 0:
-                spline = LSQUnivariateSpline(
-                    times_s, values_s, t=interior_knots, k=degree
+                t_full = np.concatenate(
+                    [
+                        [times_s[0]] * (degree + 1),
+                        interior_knots,
+                        [times_s[-1]] * (degree + 1),
+                    ]
                 )
+                spline = make_lsq_spline(times_s, values_s, t=t_full, k=degree)
             else:
-                spline = UnivariateSpline(times_s, values_s, k=degree)
+                spline = make_splrep(times_s, values_s, k=degree)
         except Exception:
             return None
 

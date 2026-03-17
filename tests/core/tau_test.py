@@ -37,6 +37,9 @@ class TauUnitTest(unittest.TestCase):
                 "napytau.core.polynomials": polynomials_mock,
             },
         ):
+            import sys as _sys
+
+            _sys.modules.pop("napytau.core.tau", None)
             from napytau.core.tau import calculate_tau_i_values
 
             initial_coefficients: np.ndarray = np.array([1, 1, 1])

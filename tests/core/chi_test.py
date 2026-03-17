@@ -758,15 +758,17 @@ class ChiUnitTest(unittest.TestCase):
             sp.optimize.OptimizeResult(x=2.0)
         )
 
-        numpy_module_mock.mean.return_value = 0
-
         with patch.dict(
             "sys.modules",
             {
                 "scipy": scipy_optimize_module_mock,
                 "numpy": numpy_module_mock,
+                "napytau.core.polynomials": polynomials_mock,
             },
         ):
+            import sys as _sys
+
+            _sys.modules.pop("napytau.core.chi", None)
             from napytau.core.chi import optimize_tau_factor
 
             initial_coefficients: np.ndarray = np.array([1, 1, 1])
@@ -825,6 +827,6 @@ class ChiUnitTest(unittest.TestCase):
                 [(t_hyp_range[0], t_hyp_range[1])],
             )
 
-            self.assertEqual(len(numpy_module_mock.mean.mock_calls), 1)
-
-            self.assertEqual(numpy_module_mock.mean.mock_calls[0].args[0], (-5, 5))
+            numpy_module_mock.sqrt.assert_called_once_with(
+                t_hyp_range[0] * t_hyp_range[1]
+            )

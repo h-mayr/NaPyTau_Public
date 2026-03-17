@@ -226,17 +226,14 @@ class PolynomialsUnitTest(unittest.TestCase):
         )
 
         spline_mock = MagicMock()
-        spline_mock._eval_args = (
-            np.array([0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0]),
-            np.array([1.0, 2.0, 3.0, 4.0]),
-            2,
-        )
+        spline_mock.c = np.array([1.0, 2.0, 3.0, 4.0])
+        spline_mock.t = np.array([0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0])
 
         dataset = _get_dataset_stub(_three_point_datapoints())
         dataset.set_sampling_points([0.5])
 
-        with patch("napytau.core.polynomials.LSQUnivariateSpline") as mock_spline_cls:
-            mock_spline_cls.return_value = spline_mock
+        with patch("napytau.core.polynomials.make_lsq_spline") as mock_spline_fn:
+            mock_spline_fn.return_value = spline_mock
             result = calculate_polynomial_coefficients_for_fit(dataset, degree=2)
 
         assert isinstance(result, tuple)
@@ -253,25 +250,22 @@ class PolynomialsUnitTest(unittest.TestCase):
         from napytau.core.polynomials import calculate_polynomial_coefficients_for_fit
 
         spline_mock = MagicMock()
-        spline_mock._eval_args = (
-            np.array([0.0, 0.0, 1.0, 2.0, 2.0]),
-            np.array([2.0, 5.0, 9.0]),
-            2,
-        )
+        spline_mock.c = np.array([2.0, 5.0, 9.0])
+        spline_mock.t = np.array([0.0, 0.0, 0.0, 2.0, 2.0, 2.0])
 
         dataset = _get_dataset_stub(_three_point_datapoints())
 
         with patch(
-            "napytau.core.polynomials.UnivariateSpline"
-        ) as mock_univariate, patch(
-            "napytau.core.polynomials.LSQUnivariateSpline"
+            "napytau.core.polynomials.make_splrep"
+        ) as mock_splrep, patch(
+            "napytau.core.polynomials.make_lsq_spline"
         ) as mock_lsq:
-            mock_univariate.return_value = spline_mock
+            mock_splrep.return_value = spline_mock
             calculate_polynomial_coefficients_for_fit(
                 dataset, degree=2, smoothing_factor=1.0
             )
 
-        mock_univariate.assert_called_once()
+        mock_splrep.assert_called_once()
         mock_lsq.assert_not_called()
 
 

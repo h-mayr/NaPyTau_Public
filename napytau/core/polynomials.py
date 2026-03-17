@@ -3,7 +3,7 @@ from napytau.core.errors.polynomial_coefficient_error import (
 )
 import numpy as np
 import scipy as sp
-from scipy.interpolate import LSQUnivariateSpline, UnivariateSpline, BSpline
+from scipy.interpolate import make_lsq_spline, make_splrep, BSpline
 
 from napytau.core.time import calculate_times_from_distances_and_relative_velocity
 from napytau.import_export.model.dataset import DataSet
@@ -72,16 +72,16 @@ def calculate_polynomial_coefficients_for_fit(
     Fits a B-spline to the dataset and returns the B-spline coefficients
     and the full knot sequence.
 
-    When smoothing_factor is None (default), uses LSQUnivariateSpline with
+    When smoothing_factor is None (default), uses make_lsq_spline with
     interior knots from dataset.get_sampling_points().
-    When smoothing_factor is a float, uses UnivariateSpline which selects
+    When smoothing_factor is a float, uses make_splrep which selects
     knots automatically via the smoothing parameter s.
 
     Args:
         dataset (DataSet): The dataset of the experiment
         degree (int): The degree of the spline (k parameter)
         smoothing_factor (float | None): If None, use LSQ mode; if float, use
-            UnivariateSpline with this smoothing parameter s.
+            make_splrep with this smoothing parameter s.
 
     Returns:
         tuple[ndarray, ndarray]: (B-spline coefficients, full knot sequence)
@@ -97,11 +97,8 @@ def calculate_polynomial_coefficients_for_fit(
     shifted_intensities = shifted_intensities[sort_idx]
 
     if smoothing_factor is not None:
-        spline = UnivariateSpline(
-            times, shifted_intensities, k=degree, s=smoothing_factor
-        )
-        full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
-        return np.asarray(coefficients), np.asarray(full_knots)
+        spline = make_splrep(times, shifted_intensities, k=degree, s=smoothing_factor)
+        return np.asarray(spline.c), np.asarray(spline.t)
 
     sampling_points = dataset.get_sampling_points()
 
@@ -114,16 +111,15 @@ def calculate_polynomial_coefficients_for_fit(
     )
 
     if len(interior_knots) == 0:
-        # No valid knots: fall back to UnivariateSpline with automatic smoothing
-        spline = UnivariateSpline(times, shifted_intensities, k=degree)
-        full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
-        return np.asarray(coefficients), np.asarray(full_knots)
+        # No valid knots: fall back to make_splrep with automatic smoothing
+        spline = make_splrep(times, shifted_intensities, k=degree)
+        return np.asarray(spline.c), np.asarray(spline.t)
 
-    spline = LSQUnivariateSpline(
-        times, shifted_intensities, t=interior_knots, k=degree
+    t_full = np.concatenate(
+        [[times[0]] * (degree + 1), interior_knots, [times[-1]] * (degree + 1)]
     )
-    full_knots, coefficients, _ = spline._eval_args  # type: ignore[misc]
-    return np.asarray(coefficients), np.asarray(full_knots)
+    spline = make_lsq_spline(times, shifted_intensities, t=t_full, k=degree)
+    return np.asarray(spline.c), np.asarray(spline.t)
 
 
 def calculate_polynomial_coefficients_for_coupled_fit(
@@ -170,13 +166,14 @@ def calculate_polynomial_coefficients_for_coupled_fit(
     )
 
     if len(interior_knots) == 0:
-        ref_spline = UnivariateSpline(times, i_sh, k=degree)
-        full_knots, _, _ = ref_spline._eval_args  # type: ignore[misc]
-        knots = np.asarray(full_knots)
+        ref_spline = make_splrep(times, i_sh, k=degree)
+        knots = np.asarray(ref_spline.t)
     else:
-        ref_spline = LSQUnivariateSpline(times, i_sh, t=interior_knots, k=degree)
-        full_knots, _, _ = ref_spline._eval_args  # type: ignore[misc]
-        knots = np.asarray(full_knots)
+        t_full = np.concatenate(
+            [[times[0]] * (degree + 1), interior_knots, [times[-1]] * (degree + 1)]
+        )
+        ref_spline = make_lsq_spline(times, i_sh, t=t_full, k=degree)
+        knots = np.asarray(ref_spline.t)
 
     n = len(times)
     n_coeffs = len(knots) - degree - 1

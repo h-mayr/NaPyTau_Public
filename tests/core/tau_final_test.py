@@ -27,6 +27,9 @@ class TauFinalUnitTest(unittest.TestCase):
                 "numpy": numpy_module_mock,
             },
         ):
+            import sys as _sys
+
+            _sys.modules.pop("napytau.core.tau_final", None)
             from napytau.core.tau_final import calculate_tau_final
 
             tau_i: np.ndarray = np.array([2, 4])
