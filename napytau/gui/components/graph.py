@@ -323,7 +323,7 @@ class Graph:
                 calc_dataset, coefficients, knots, self.parent.polynomial_degree
             )
             delta_tau_i = calculate_error_propagation_terms(
-                calc_dataset, coefficients, tau_factor, knots, self.parent.polynomial_degree
+                calc_dataset, coefficients, knots, self.parent.polynomial_degree
             )
             distances = np.array(
                 calc_dataset.get_datapoints().get_distances().get_values()

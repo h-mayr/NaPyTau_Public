@@ -43,7 +43,6 @@ def calculate_lifetime_for_fit(
     delta_tau_i_values: np.ndarray = calculate_error_propagation_terms(
         dataset,
         coefficients,
-        0,
         knots,
         polynomial_degree,
     )
@@ -128,7 +127,6 @@ def calculate_lifetime_for_custom_tau_factor(
     delta_tau_i_values: np.ndarray = calculate_error_propagation_terms(
         calc_ds,
         coefficients,
-        custom_tau_factor,
         knots,
         polynomial_degree,
     )

@@ -176,19 +176,14 @@ class CoreUnitTest(unittest.TestCase):
                 _MOCK_COEFFICIENTS,
             )
 
-            self.assertEqual(
-                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[2],
-                1.0,
-            )
-
             # Verify knots and degree are forwarded to calculate_error_propagation_terms
             np.testing.assert_array_equal(
-                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[3],
+                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[2],
                 _MOCK_KNOTS,
             )
 
             self.assertEqual(
-                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[4],
+                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[3],
                 2,
             )
 

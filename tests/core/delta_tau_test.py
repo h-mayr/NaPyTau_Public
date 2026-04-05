@@ -1,3 +1,4 @@
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 import numpy as np
@@ -63,6 +64,7 @@ class DeltaTauUnitTests(unittest.TestCase):
                 "numpy": numpy_module_mock,
             },
         ):
+            sys.modules.pop("napytau.core.delta_tau", None)
             from napytau.core.delta_tau import calculate_jacobian_matrix
 
             coefficients = np.array([5, 4])
@@ -116,6 +118,7 @@ class DeltaTauUnitTests(unittest.TestCase):
                 "numpy": numpy_module_mock,
             },
         ):
+            sys.modules.pop("napytau.core.delta_tau", None)
             from napytau.core.delta_tau import calculate_covariance_matrix
 
             datapoints = DatapointCollection(
@@ -157,111 +160,86 @@ class DeltaTauUnitTests(unittest.TestCase):
             )
 
     def test_CanCalculateTheErrorPropagation(self):
-        """Can calculate the error propagation using einsum-based delta_p calculation."""
-        polynomial_module_mock, zeros_mock, numpy_module_mock = set_up_mocks()
+        """
+        Verifies the corrected Gaussian error propagation for τᵢ = Iu / P'(t):
 
-        # evaluate_polynomial_at_measuring_times side_effect:
-        # Called twice per coefficient (perturbed, original) × 2 coefficients × 2 jacobian calls
-        # = 8 total calls. All return scalars that produce a uniform jacobian.
-        polynomial_module_mock.evaluate_polynomial_at_measuring_times.side_effect = [
-            6, 3, 2, 1,  # first jacobian call (from calculate_jacobian_matrix explicit)
-            6, 3, 2, 1,  # second jacobian call (inside calculate_covariance_matrix)
-        ]
-        polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.return_value = np.array(
-            [4, 4, 4]
+            σ(τᵢ)² = σ(Iu_i)²/P'² + Iu_i²·Var[P'(tᵢ)]/P'⁴
+
+        Test setup (degree-1, knots=[0,0,1,1], two datapoints at t=0 and t=1):
+          - coefficients = [2, 4]  →  P(t) = 2+2t,  P'(t) = 2 everywhere
+          - shifted intensities: [2, 4] ± [0.3, 0.4]
+          - unshifted intensities: [3, 5] ± [0.5, 0.7]
+
+        Covariance (diagonal since J=I at endpoints):  diag([0.09, 0.16])
+        Var[P'(tᵢ)] = J'@Cov@J'ᵀ = 0.09+0.16 = 0.25  (same at both points)
+        term1 = [0.0625, 0.1225]
+        term2 = [9·0.25/16, 25·0.25/16] = [0.140625, 0.390625]
+        σ(τ) = [√0.203125, √0.513125]
+        """
+        from napytau.core.delta_tau import calculate_error_propagation_terms
+
+        knots = np.array([0.0, 0.0, 1.0, 1.0])
+        degree = 1
+        coefficients = np.array([2.0, 4.0])
+
+        datapoints = DatapointCollection(
+            [
+                Datapoint(
+                    ValueErrorPair(0.0, 0.0),
+                    None,
+                    ValueErrorPair(2.0, 0.3),  # shifted Is=2, σ=0.3
+                    ValueErrorPair(3.0, 0.5),  # unshifted Iu=3, σ=0.5
+                ),
+                Datapoint(
+                    ValueErrorPair(1.0, 0.0),
+                    None,
+                    ValueErrorPair(4.0, 0.4),  # shifted Is=4, σ=0.4
+                    ValueErrorPair(5.0, 0.7),  # unshifted Iu=5, σ=0.7
+                ),
+            ]
         )
 
-        zeros_mock.side_effect = [
-            np.array([[0, 0], [0, 0], [0, 0]]),  # first jacobian zeros
-            np.array([[0, 0], [0, 0], [0, 0]]),  # second jacobian zeros
-        ]
-        numpy_module_mock.power.side_effect = [
-            np.array([25, 36, 49]),   # unshifted errors^2
-            np.array([16, 16, 16]),   # diff_poly^2
-            np.array([4, 9, 16]),     # shifted errors^2 (for weight matrix in covariance)
-            np.array([4, 5, 6]),      # unshifted values^2 (numerator of poly uncertainty)
-            np.array([256, 256, 256]),  # diff_poly^4
-            np.array([64, 64, 64]),   # delta_p^2
-            np.array([64, 64, 64]),   # diff_poly^3
-        ]
-        numpy_module_mock.diag.return_value = np.array(
-            [[1 / 4, 0, 0], [0, 1 / 9, 0], [0, 0, 1 / 16]]
+        result = calculate_error_propagation_terms(
+            _get_dataset_stub(datapoints),
+            coefficients,
+            knots,
+            degree,
         )
-        numpy_module_mock.linalg.pinv.return_value = np.array(
-            [[-0.13826047, 0.41478141], [0.41478141, -1.24434423]]
+
+        expected = np.sqrt(np.array([0.203125, 0.513125]))
+        np.testing.assert_allclose(result, expected, rtol=1e-5)
+
+    def test_CanCalculateDerivativeJacobianMatrix(self):
+        """
+        Verifies calculate_derivative_jacobian_matrix for a degree-1 spline.
+
+        For knots=[0,0,1,1] and degree=1 the two basis functions are:
+          B0(t) = 1-t  →  B'0(t) = -1
+          B1(t) = t    →  B'1(t) =  1
+        so J'[i,:] = [-1, 1] for every evaluation point.
+        """
+        from napytau.core.delta_tau import calculate_derivative_jacobian_matrix
+
+        knots = np.array([0.0, 0.0, 1.0, 1.0])
+        degree = 1
+        coefficients = np.array([2.0, 4.0])
+
+        datapoints = DatapointCollection(
+            [
+                Datapoint(ValueErrorPair(0.0, 0.0)),
+                Datapoint(ValueErrorPair(1.0, 0.0)),
+            ]
         )
-        numpy_module_mock.einsum = np.einsum
-        numpy_module_mock.zeros = zeros_mock
 
-        with patch.dict(
-            "sys.modules",
-            {
-                "napytau.core.polynomials": polynomial_module_mock,
-                "numpy": numpy_module_mock,
-            },
-        ):
-            from napytau.core.delta_tau import (
-                calculate_error_propagation_terms,
-            )
+        result = calculate_derivative_jacobian_matrix(
+            _get_dataset_stub(datapoints),
+            coefficients,
+            knots,
+            degree,
+        )
 
-            coefficients: np.array = np.array([5, 4])
-            taufactor = 0.4
-            datapoints = DatapointCollection(
-                [
-                    Datapoint(
-                        ValueErrorPair(0.0, 0.16),
-                        None,
-                        ValueErrorPair(0, 2),
-                        ValueErrorPair(4, 5),
-                    ),
-                    Datapoint(
-                        ValueErrorPair(1.0, 0.16),
-                        None,
-                        ValueErrorPair(0, 3),
-                        ValueErrorPair(5, 6),
-                    ),
-                    Datapoint(
-                        ValueErrorPair(2.0, 0.16),
-                        None,
-                        ValueErrorPair(0, 4),
-                        ValueErrorPair(6, 7),
-                    ),
-                ]
-            )
-
-            calculate_error_propagation_terms(
-                _get_dataset_stub(datapoints),
-                coefficients,
-                taufactor,
-                _TEST_KNOTS,
-                _TEST_DEGREE,
-            )
-
-            # Verify evaluate_differentiated_polynomial was called with correct args
-            self.assertEqual(
-                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
-                    0
-                ].args[0],
-                _get_dataset_stub(datapoints),
-            )
-            np.testing.assert_array_equal(
-                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
-                    0
-                ].args[1],
-                np.array([5, 4]),
-            )
-            np.testing.assert_array_equal(
-                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
-                    0
-                ].args[2],
-                _TEST_KNOTS,
-            )
-            self.assertEqual(
-                polynomial_module_mock.evaluate_differentiated_polynomial_at_measuring_times.mock_calls[
-                    0
-                ].args[3],
-                _TEST_DEGREE,
-            )
+        expected = np.array([[-1.0, 1.0], [-1.0, 1.0]])
+        np.testing.assert_allclose(result, expected, atol=1e-6)
 
 
 if __name__ == "__main__":

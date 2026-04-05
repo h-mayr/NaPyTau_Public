@@ -4,8 +4,10 @@ from napytau.core.polynomials import (
     evaluate_differentiated_polynomial_at_measuring_times,
     evaluate_polynomial_at_measuring_times,
 )
+from napytau.core.time import calculate_times_from_distances_and_relative_velocity
 import numpy as np
 from numpy.random import Generator
+from scipy.interpolate import BSpline
 
 from napytau.import_export.model.datapoint import Datapoint
 from napytau.import_export.model.datapoint_collection import DatapointCollection
@@ -61,6 +63,41 @@ def calculate_jacobian_matrix(
     return jacobian_matrix
 
 
+def calculate_derivative_jacobian_matrix(
+    dataset: DataSet,
+    coefficients: np.ndarray,
+    knots: np.ndarray,
+    degree: int,
+) -> np.ndarray:
+    """
+    Calculates the Jacobian matrix of the B-spline derivative w.r.t. its coefficients.
+
+    Since P'(t) = Σⱼ cⱼ · B'ⱼ,k(t), each partial derivative is simply the
+    corresponding derivative basis function: J'[i, j] = B'ⱼ,k(tᵢ).
+
+    Args:
+        dataset (DataSet): The dataset of the experiment
+        coefficients (ndarray): B-spline coefficients
+        knots (ndarray): Full B-spline knot sequence
+        degree (int): Degree of the B-spline
+
+    Returns:
+        ndarray: Jacobian matrix of shape (len(distances), len(coefficients)).
+    """
+    times = calculate_times_from_distances_and_relative_velocity(dataset)
+    n_coeffs = len(coefficients)
+    jacobian_deriv: np.ndarray = np.zeros((len(times), n_coeffs))
+
+    for j in range(n_coeffs):
+        e_j = np.zeros(n_coeffs)
+        e_j[j] = 1.0
+        jacobian_deriv[:, j] = np.asarray(
+            BSpline(knots, e_j, degree).derivative()(times)
+        )
+
+    return jacobian_deriv
+
+
 def calculate_covariance_matrix(
     dataset: DataSet,
     coefficients: np.ndarray,
@@ -101,75 +138,44 @@ def calculate_covariance_matrix(
 def calculate_error_propagation_terms(
     dataset: DataSet,
     coefficients: np.ndarray,
-    taufactor: float,
     knots: np.ndarray,
     degree: int,
 ) -> np.ndarray:
     """
-    Creates the error propagation terms for the B-spline coefficients,
-    combining direct errors, spline uncertainties, and mixed covariance terms.
+    Computes σ(τᵢ) via Gaussian error propagation of τᵢ = Iu(tᵢ) / P'(tᵢ):
+
+        σ(τᵢ)² = σ(Iu_i)² / P'(tᵢ)²  +  Iu_i² · Var[P'(tᵢ)] / P'(tᵢ)⁴
+
+    where Var[P'(tᵢ)] = J'[i,:] @ Cov @ J'[i,:]ᵀ  and  J'[i,j] = B'ⱼ,k(tᵢ).
 
     Args:
         dataset (DataSet): The dataset of the experiment
         coefficients (ndarray): B-spline coefficients
-        taufactor (float): Scaling factor related to the Doppler-shift model.
         knots (ndarray): Full B-spline knot sequence
         degree (int): Degree of the B-spline
 
     Returns:
-        ndarray: The combined error propagation terms for each distance point.
+        ndarray: Per-datapoint standard deviation σ(τᵢ).
     """
-
     datapoints = dataset.get_datapoints()
-    calculated_differentiated_polynomial_sum_at_measuring_distances = (
-        evaluate_differentiated_polynomial_at_measuring_times(
-            dataset,
-            coefficients,
-            knots,
-            degree,
-        )
-    )
-
-    gaussian_error_from_unshifted_intensity: np.ndarray = np.power(
-        datapoints.get_unshifted_intensities().get_errors(), 2
-    ) / np.power(
-        calculated_differentiated_polynomial_sum_at_measuring_distances,
-        2,
-    )
-
-    jacobian_matrix: np.ndarray = calculate_jacobian_matrix(
+    p_prime: np.ndarray = evaluate_differentiated_polynomial_at_measuring_times(
         dataset, coefficients, knots, degree
     )
-    covariance_matrix: np.ndarray = calculate_covariance_matrix(
+    iu: np.ndarray = np.array(datapoints.get_unshifted_intensities().get_values())
+    sigma_iu: np.ndarray = np.array(datapoints.get_unshifted_intensities().get_errors())
+
+    # Term 1: measurement uncertainty on Iu
+    term1: np.ndarray = np.power(sigma_iu, 2) / np.power(p_prime, 2)
+
+    # Term 2: spline-fit uncertainty propagated through P'(tᵢ)
+    j_prime: np.ndarray = calculate_derivative_jacobian_matrix(
         dataset, coefficients, knots, degree
     )
+    cov: np.ndarray = calculate_covariance_matrix(dataset, coefficients, knots, degree)
+    var_p_prime: np.ndarray = np.einsum("ij,jk,ik->i", j_prime, cov, j_prime)
+    term2: np.ndarray = np.power(iu, 2) * var_p_prime / np.power(p_prime, 4)
 
-    # Var[P(t_i)] = J[i,:] @ Cov @ J[i,:]^T — correct for any basis
-    delta_p_j_i_squared: np.ndarray = np.einsum(
-        "ij,jk,ik->i", jacobian_matrix, covariance_matrix, jacobian_matrix
-    )
-
-    gaussian_error_from_polynomial_uncertainties: np.ndarray = (
-        np.power(datapoints.get_unshifted_intensities().get_values(), 2)
-        / np.power(
-            calculated_differentiated_polynomial_sum_at_measuring_distances,
-            4,
-        )
-    ) * np.power(delta_p_j_i_squared, 2)
-
-    error_from_covariance: np.ndarray = (
-        datapoints.get_unshifted_intensities().get_values()
-        * taufactor
-        * delta_p_j_i_squared
-    ) / np.power(calculated_differentiated_polynomial_sum_at_measuring_distances, 3)
-
-    interim_result: np.ndarray = (
-        gaussian_error_from_unshifted_intensity
-        + gaussian_error_from_polynomial_uncertainties
-    )
-    errors: np.ndarray = interim_result + error_from_covariance
-    # Return the sum of all three contributions
-    return errors
+    return np.asarray(np.sqrt(term1 + term2))
 
 
 def _perturb_dataset(dataset: DataSet, rng: Generator) -> DataSet:
@@ -240,7 +246,7 @@ def calculate_error_propagation_mc(
                 )
             tau_i = calculate_tau_i_values(perturbed, coefficients, knots, degree)
             delta_tau_i = calculate_error_propagation_terms(
-                perturbed, coefficients, 0.0, knots, degree
+                perturbed, coefficients, knots, degree
             )
             tau_mc, _ = calculate_tau_final(tau_i, delta_tau_i)
             if np.isfinite(tau_mc) and tau_mc != -1:
