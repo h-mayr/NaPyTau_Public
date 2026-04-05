@@ -342,6 +342,7 @@ class App(customtkinter.CTk):
         """Update the graph and recalculate τ (deferred so menus close first)."""
         self.graph.update_plot()
         self.control_panel.recalculate()
+        self.control_panel.update_status()
 
     def _reset_state(self) -> None:
         """Clear all per-dataset state before loading a new dataset."""
@@ -365,11 +366,21 @@ class App(customtkinter.CTk):
 
     @property
     def active_dataset(self) -> DataSet:
-        """Return a DataSet with only the active (checked) datapoints."""
+        """Return a DataSet with only the fitting-active datapoints."""
         ds = self.dataset[0]
         return DataSet(
             relative_velocity=ds.get_relative_velocity(),
             datapoints=ds.get_datapoints().get_active_datapoints(),
+            sampling_points=ds.get_sampling_points(),
+        )
+
+    @property
+    def active_dataset_for_calculation(self) -> DataSet:
+        """Return a DataSet with only the calculation-active datapoints."""
+        ds = self.dataset[0]
+        return DataSet(
+            relative_velocity=ds.get_relative_velocity(),
+            datapoints=ds.get_datapoints().get_active_for_calculation_datapoints(),
             sampling_points=ds.get_sampling_points(),
         )
 

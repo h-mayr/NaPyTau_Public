@@ -293,8 +293,13 @@ class Graph:
         self.parent.after(0, self.update_plot)
 
     def plot_tau_values(self, axes: Axes) -> None:
-        """Plot per-datapoint τᵢ ± Δτᵢ values vs distances on the given axes."""
+        """Plot per-datapoint τᵢ ± Δτᵢ values vs distances on the given axes.
+
+        The spline fit uses the fitting-active dataset; τᵢ evaluation and display
+        use only the calculation-active dataset.
+        """
         dataset = self.parent.active_dataset
+        calc_dataset = self.parent.active_dataset_for_calculation
         try:
             tau_factor = (
                 self.parent.control_panel.timescale.get()
@@ -315,12 +320,14 @@ class Graph:
                     self.parent.smoothing_factor,
                 )
             tau_i = calculate_tau_i_values(
-                dataset, coefficients, knots, self.parent.polynomial_degree
+                calc_dataset, coefficients, knots, self.parent.polynomial_degree
             )
             delta_tau_i = calculate_error_propagation_terms(
-                dataset, coefficients, tau_factor, knots, self.parent.polynomial_degree
+                calc_dataset, coefficients, tau_factor, knots, self.parent.polynomial_degree
             )
-            distances = np.array(dataset.get_datapoints().get_distances().get_values())
+            distances = np.array(
+                calc_dataset.get_datapoints().get_distances().get_values()
+            )
             axes.errorbar(
                 distances,
                 tau_i,

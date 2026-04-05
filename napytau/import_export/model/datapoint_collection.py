@@ -138,3 +138,6 @@ class DatapointCollection:
 
     def get_active_datapoints(self) -> DatapointCollection:
         return self.filter(lambda datapoint: datapoint.active)
+
+    def get_active_for_calculation_datapoints(self) -> DatapointCollection:
+        return self.filter(lambda datapoint: datapoint.active_for_calculation)

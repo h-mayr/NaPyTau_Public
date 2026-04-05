@@ -45,6 +45,10 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         Create the control panel widgets.
         """
+        # Row 0: Fit settings status
+        status_widget = self._create_status_widget()
+        status_widget.pack(fill="x", padx=5, pady=(5, 0))
+
         # Row 1: Timescale Controls
         timescale_widget = self._create_timescale_widget()
         timescale_widget.pack(fill="x", padx=5, pady=5)
@@ -56,6 +60,40 @@ class ControlPanel(customtkinter.CTkFrame):
         # Row 3: Tau display
         tau_widget = self._create_tau_widget()
         tau_widget.pack(fill="x", padx=5, pady=5)
+
+    def _create_status_widget(self) -> customtkinter.CTkFrame:
+        """Create the fit-settings status label."""
+        frame = customtkinter.CTkFrame(self)
+        self._status_var = customtkinter.StringVar(value=self._build_status_text())
+        label = customtkinter.CTkLabel(
+            frame,
+            textvariable=self._status_var,
+            font=("Arial", 11),
+            anchor="w",
+        )
+        label.pack(fill="x", padx=8, pady=3)
+        return frame
+
+    def _build_status_text(self) -> str:
+        """Build the status string from current app fit settings."""
+        fit_mode = self.parent.fit_mode
+        if fit_mode == "smooth" and self.parent.smoothing_factor is not None:
+            mode_str = f"Smooth (s={self.parent.smoothing_factor})"
+        elif fit_mode == "coupled":
+            mode_str = "Coupled"
+        else:
+            mode_str = "LSQ"
+        k = self.parent.polynomial_degree
+        knot_mode = self.parent.knot_spacing_mode
+        if knot_mode == "manual":
+            knots_str = "manual"
+        else:
+            knots_str = f"{knot_mode} ({self.parent.n_auto_knots})"
+        return f"Mode: {mode_str} | k={k} | Knots: {knots_str}"
+
+    def update_status(self) -> None:
+        """Refresh the status label to reflect current fit settings."""
+        self._status_var.set(self._build_status_text())
 
     def _create_timescale_widget(self) -> customtkinter.CTkFrame:
         """
@@ -91,6 +129,7 @@ class ControlPanel(customtkinter.CTkFrame):
                         self.parent.polynomial_degree,
                         self.parent.smoothing_factor,
                         fit_mode=self.parent.fit_mode,
+                        calculation_dataset=self.parent.active_dataset_for_calculation,
                     )
 
                     self._apply_lifetime(lifetime)
@@ -118,6 +157,7 @@ class ControlPanel(customtkinter.CTkFrame):
                     self.parent.polynomial_degree,
                     self.parent.smoothing_factor,
                     fit_mode=self.parent.fit_mode,
+                    calculation_dataset=self.parent.active_dataset_for_calculation,
                 )
 
                 self._apply_lifetime(lifetime)
@@ -132,13 +172,11 @@ class ControlPanel(customtkinter.CTkFrame):
 
         # Function for adding and subtracting from tau factor in ±5% steps
 
-        add_on_tau_factor = (
-            lambda pct: tau_factor.set(
-                f"{float(tau_factor.get()) * (1.0 + pct):.4g}"
-            )
-            if float(tau_factor.get()) * (1.0 + pct) >= self.timescale_min
-            else None
-        )
+        def add_on_tau_factor(pct: float) -> None:
+            new_value = float(tau_factor.get()) * (1.0 + pct)
+            if new_value >= self.timescale_min:
+                tau_factor.set(f"{new_value:.4g}")
+                update_timescale()
 
         # Create buttons for adding and subtracting
         add_taufactor_button = customtkinter.CTkButton(
@@ -218,7 +256,7 @@ class ControlPanel(customtkinter.CTkFrame):
         frame.columnconfigure(2, weight=1)
 
         button = customtkinter.CTkButton(
-            frame, text="τ ± Δτ [ps]:", command=lambda: self._tau_button_event(0.0, 0.0)
+            frame, text="Calculate τ", command=self.recalculate
         )
 
         label = customtkinter.CTkLabel(frame, text="|τ - t| [ps]:")
@@ -341,6 +379,7 @@ class ControlPanel(customtkinter.CTkFrame):
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
                 fit_mode=self.parent.fit_mode,
+                calculation_dataset=self.parent.active_dataset_for_calculation,
             )
             self._apply_lifetime(lifetime)
 
@@ -397,6 +436,7 @@ class ControlPanel(customtkinter.CTkFrame):
                 self.parent.polynomial_degree,
                 self.parent.smoothing_factor,
                 fit_mode=self.parent.fit_mode,
+                calculation_dataset=self.parent.active_dataset_for_calculation,
             )
             self._apply_lifetime(lifetime)
         except Exception as e:

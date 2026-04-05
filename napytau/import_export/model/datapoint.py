@@ -24,6 +24,7 @@ class Datapoint:
     feeding_unshifted_intensity: Optional[ValueErrorPair[float]] = None
     tau: Optional[ValueErrorPair[float]] = None
     active: bool = True
+    active_for_calculation: bool = True
 
     def get_distance(self) -> ValueErrorPair[float]:
         return self.distance

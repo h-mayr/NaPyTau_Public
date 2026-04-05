@@ -93,10 +93,16 @@ def calculate_lifetime_for_custom_tau_factor(
     polynomial_degree: int,
     smoothing_factor: float | None = None,
     fit_mode: str = "lsq",
+    calculation_dataset: DataSet | None = None,
 ) -> Tuple[float, float]:
     """
     Docstring missing. To be implemented with issue #44.
+
+    dataset is used for the spline fit; calculation_dataset (if provided) is
+    used for τᵢ evaluation and the weighted mean. Defaults to dataset when omitted.
     """
+    calc_ds = calculation_dataset if calculation_dataset is not None else dataset
+
     if fit_mode == "coupled":
         coefficients, knots = calculate_polynomial_coefficients_for_coupled_fit(
             dataset, custom_tau_factor, polynomial_degree
@@ -112,7 +118,7 @@ def calculate_lifetime_for_custom_tau_factor(
 
     # We now calculate the lifetimes tau_i for all measured distances
     tau_i_values: np.ndarray = calculate_tau_i_values(
-        dataset,
+        calc_ds,
         coefficients,
         knots,
         polynomial_degree,
@@ -120,7 +126,7 @@ def calculate_lifetime_for_custom_tau_factor(
 
     # And we calculate the respective errors for the lifetimes
     delta_tau_i_values: np.ndarray = calculate_error_propagation_terms(
-        dataset,
+        calc_ds,
         coefficients,
         custom_tau_factor,
         knots,
