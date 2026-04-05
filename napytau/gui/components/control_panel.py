@@ -1,3 +1,4 @@
+import math
 import customtkinter
 from typing import TYPE_CHECKING
 
@@ -333,6 +334,16 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         self.timescale.set(round(float(value), 2))
 
+    @staticmethod
+    def _format_lifetime(tau: float, delta_tau: float) -> tuple[str, str]:
+        """Format τ and Δτ so that Δτ shows 2 significant figures and τ is
+        rounded to the same decimal place."""
+        if not (math.isfinite(delta_tau) and delta_tau > 0):
+            return f"{tau:.4g}", f"{delta_tau:.4g}"
+        magnitude = math.floor(math.log10(delta_tau))
+        decimal_places = max(0, -(magnitude - 1))
+        return f"{tau:.{decimal_places}f}", f"{delta_tau:.{decimal_places}f}"
+
     def _apply_lifetime(self, lifetime: tuple[float, float]) -> None:
         """Set τ ± Δτ display, logging an error if τ is negative."""
         tau, delta_tau = lifetime
@@ -342,8 +353,9 @@ class ControlPanel(customtkinter.CTkFrame):
                 LogMessageType.ERROR,
             )
             return
-        self.result_tau.set(str(tau))
-        self.result_tau_error.set(str(delta_tau))
+        tau_str, delta_tau_str = self._format_lifetime(tau, delta_tau)
+        self.result_tau.set(tau_str)
+        self.result_tau_error.set(delta_tau_str)
 
     def _tau_button_event(self, value: float, error: float) -> None:
         """
