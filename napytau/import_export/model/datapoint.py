@@ -53,23 +53,23 @@ class Datapoint:
     def get_normalized_intensity(
         self,
     ) -> Tuple[ValueErrorPair[float], ValueErrorPair[float]]:
-        """Return (shifted, unshifted) intensities divided by the calibration factor.
+        """Return (shifted, unshifted) intensities multiplied by the calibration factor.
 
-        If no calibration is set (or its value is zero), raw intensities are returned.
-        Error propagation: σ(I/norm)² = (σI/norm)² + (I·σnorm/norm²)²
+        If no calibration is set, raw intensities are returned.
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
         """
         sh, us = self.get_intensity()
-        if self.calibration is None or self.calibration.value == 0:
+        if self.calibration is None:
             return sh, us
         norm = self.calibration.value
         sigma_norm = self.calibration.error
         sh_norm = ValueErrorPair(
-            sh.value / norm,
-            ((sh.error / norm) ** 2 + (sh.value * sigma_norm / norm**2) ** 2) ** 0.5,
+            sh.value * norm,
+            ((sh.error * norm) ** 2 + (sh.value * sigma_norm) ** 2) ** 0.5,
         )
         us_norm = ValueErrorPair(
-            us.value / norm,
-            ((us.error / norm) ** 2 + (us.value * sigma_norm / norm**2) ** 2) ** 0.5,
+            us.value * norm,
+            ((us.error * norm) ** 2 + (us.value * sigma_norm) ** 2) ** 0.5,
         )
         return sh_norm, us_norm
 

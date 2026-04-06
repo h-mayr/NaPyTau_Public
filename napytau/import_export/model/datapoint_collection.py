@@ -100,27 +100,23 @@ class DatapointCollection:
         )
 
     def get_normalized_shifted_intensities(self) -> ValueErrorPairCollection[float]:
-        """Return shifted intensities divided by per-datapoint calibration factors.
+        """Return shifted intensities multiplied by per-datapoint calibration factors.
 
         Datapoints without a calibration value are returned with raw intensities.
-        Error propagation: σ(I/norm)² = (σI/norm)² + (I·σnorm/norm²)²
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
         """
         result = []
         for dp in self.elements.values():
             if dp.shifted_intensity is None:
                 continue
             sh = dp.shifted_intensity
-            if dp.calibration is not None and dp.calibration.value != 0:
+            if dp.calibration is not None:
                 norm = dp.calibration.value
                 sigma_norm = dp.calibration.error
                 result.append(
                     ValueErrorPair(
-                        sh.value / norm,
-                        (
-                            (sh.error / norm) ** 2
-                            + (sh.value * sigma_norm / norm**2) ** 2
-                        )
-                        ** 0.5,
+                        sh.value * norm,
+                        ((sh.error * norm) ** 2 + (sh.value * sigma_norm) ** 2) ** 0.5,
                     )
                 )
             else:
@@ -128,27 +124,23 @@ class DatapointCollection:
         return ValueErrorPairCollection(result)
 
     def get_normalized_unshifted_intensities(self) -> ValueErrorPairCollection[float]:
-        """Return unshifted intensities divided by per-datapoint calibration factors.
+        """Return unshifted intensities multiplied by per-datapoint calibration factors.
 
         Datapoints without a calibration value are returned with raw intensities.
-        Error propagation: σ(I/norm)² = (σI/norm)² + (I·σnorm/norm²)²
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
         """
         result = []
         for dp in self.elements.values():
             if dp.unshifted_intensity is None:
                 continue
             us = dp.unshifted_intensity
-            if dp.calibration is not None and dp.calibration.value != 0:
+            if dp.calibration is not None:
                 norm = dp.calibration.value
                 sigma_norm = dp.calibration.error
                 result.append(
                     ValueErrorPair(
-                        us.value / norm,
-                        (
-                            (us.error / norm) ** 2
-                            + (us.value * sigma_norm / norm**2) ** 2
-                        )
-                        ** 0.5,
+                        us.value * norm,
+                        ((us.error * norm) ** 2 + (us.value * sigma_norm) ** 2) ** 0.5,
                     )
                 )
             else:
