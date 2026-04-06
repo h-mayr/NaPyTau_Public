@@ -11,8 +11,6 @@ from scipy.interpolate import make_lsq_spline, make_splrep
 
 from napytau.gui.components.toolbar import Toolbar
 from napytau.gui.model.color import Color
-from napytau.gui.model.marker_factory import generate_marker
-from napytau.gui.model.marker_factory import generate_error_marker_path
 
 from napytau.core.polynomials import (
     calculate_polynomial_coefficients_for_coupled_fit,
@@ -143,7 +141,7 @@ class Graph:
         intensity_index: int,
     ) -> None:
         """Set y-axis limits to cover value ± error for all active datapoints."""
-        pairs = [dp.get_intensity()[intensity_index] for dp in datapoints]
+        pairs = [dp.get_normalized_intensity()[intensity_index] for dp in datapoints]
         y_lo = min(p.value - p.error for p in pairs)
         y_hi = max(p.value + p.error for p in pairs)
         pad = (y_hi - y_lo) * 0.1 if y_hi != y_lo else abs(y_hi) * 0.1 + 1.0
@@ -248,44 +246,56 @@ class Graph:
     def plot_shifted_markers(
         self, datapoints: DatapointCollection, axes: Axes
     ) -> None:
-        """Plot shifted-intensity markers (green) on the given axes."""
+        """Plot shifted-intensity markers with error bars (green) on the given axes."""
         checked_datapoints: DatapointCollection = datapoints.get_active_datapoints()
 
-        for index, datapoint in enumerate(checked_datapoints):
-            marker = generate_marker(
-                generate_error_marker_path(datapoint.get_intensity()[0].error)
-            )
-            size = datapoint.get_intensity()[0].error
-            axes.plot(
-                datapoint.get_distance().value,
-                datapoint.get_intensity()[0].value,
-                marker=marker,
-                linestyle="None",
-                markersize=size,
-                label=f"Point {index + 1}",
-                color=self.main_marker_color,
-            )
+        distances = np.array(
+            [dp.get_distance().value for dp in checked_datapoints]
+        )
+        values = np.array(
+            [dp.get_normalized_intensity()[0].value for dp in checked_datapoints]
+        )
+        errors = np.array(
+            [dp.get_normalized_intensity()[0].error for dp in checked_datapoints]
+        )
+        axes.errorbar(
+            distances,
+            values,
+            yerr=errors,
+            fmt="o",
+            markersize=4,
+            color=self.main_marker_color,
+            ecolor=self.main_marker_color,
+            capsize=2,
+            linewidth=0.8,
+        )
 
     def plot_unshifted_markers(
         self, datapoints: DatapointCollection, axes: Axes
     ) -> None:
-        """Plot unshifted-intensity markers (red) on the given axes."""
+        """Plot unshifted-intensity markers with error bars (red) on the given axes."""
         checked_datapoints: DatapointCollection = datapoints.get_active_datapoints()
 
-        for index, datapoint in enumerate(checked_datapoints):
-            marker = generate_marker(
-                generate_error_marker_path(datapoint.get_intensity()[1].error)
-            )
-            size = datapoint.get_intensity()[1].error
-            axes.plot(
-                datapoint.get_distance().value,
-                datapoint.get_intensity()[1].value,
-                marker=marker,
-                linestyle="None",
-                markersize=size,
-                label=f"Point {index + 1}",
-                color=self.secondary_marker_color,
-            )
+        distances = np.array(
+            [dp.get_distance().value for dp in checked_datapoints]
+        )
+        values = np.array(
+            [dp.get_normalized_intensity()[1].value for dp in checked_datapoints]
+        )
+        errors = np.array(
+            [dp.get_normalized_intensity()[1].error for dp in checked_datapoints]
+        )
+        axes.errorbar(
+            distances,
+            values,
+            yerr=errors,
+            fmt="o",
+            markersize=4,
+            color=self.secondary_marker_color,
+            ecolor=self.secondary_marker_color,
+            capsize=2,
+            linewidth=0.8,
+        )
 
     def toggle_axes_tau_yscale(self) -> None:
         """Switch top (τ) subplot y-axis between linear and log scale."""
@@ -404,7 +414,7 @@ class Graph:
         """Plot the B-spline fit through shifted intensities on the given axes."""
         active = datapoints.get_active_datapoints()
         distances = np.array(active.get_distances().get_values())
-        shifted = np.array(active.get_shifted_intensities().get_values())
+        shifted = np.array(active.get_normalized_shifted_intensities().get_values())
 
         result = self._fit_spline_for_display(distances, shifted)
         if result is None:
@@ -418,7 +428,7 @@ class Graph:
         """Plot the B-spline fit through unshifted intensities on the given axes."""
         active = datapoints.get_active_datapoints()
         distances = np.array(active.get_distances().get_values())
-        unshifted = np.array(active.get_unshifted_intensities().get_values())
+        unshifted = np.array(active.get_normalized_unshifted_intensities().get_values())
 
         result = self._fit_spline_for_display(distances, unshifted)
         if result is None:

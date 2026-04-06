@@ -125,7 +125,7 @@ def calculate_covariance_matrix(
 
     # Construct the weight matrix from the inverse squared errors
     weight_matrix: np.ndarray = np.diag(
-        1 / np.power(datapoints.get_shifted_intensities().get_errors(), 2)
+        1 / np.power(datapoints.get_normalized_shifted_intensities().get_errors(), 2)
     )
 
     fit_matrix: np.ndarray = jacobian_matrix.T @ weight_matrix @ jacobian_matrix
@@ -161,8 +161,12 @@ def calculate_error_propagation_terms(
     p_prime: np.ndarray = evaluate_differentiated_polynomial_at_measuring_times(
         dataset, coefficients, knots, degree
     )
-    iu: np.ndarray = np.array(datapoints.get_unshifted_intensities().get_values())
-    sigma_iu: np.ndarray = np.array(datapoints.get_unshifted_intensities().get_errors())
+    iu: np.ndarray = np.array(
+        datapoints.get_normalized_unshifted_intensities().get_values()
+    )
+    sigma_iu: np.ndarray = np.array(
+        datapoints.get_normalized_unshifted_intensities().get_errors()
+    )
 
     # Term 1: measurement uncertainty on Iu
     term1: np.ndarray = np.power(sigma_iu, 2) / np.power(p_prime, 2)

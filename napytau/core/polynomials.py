@@ -88,7 +88,7 @@ def calculate_polynomial_coefficients_for_fit(
     """
     times: np.ndarray = calculate_times_from_distances_and_relative_velocity(dataset)
     shifted_intensities = np.array(
-        dataset.get_datapoints().get_shifted_intensities().get_values()
+        dataset.get_datapoints().get_normalized_shifted_intensities().get_values()
     )
 
     # Both spline variants require data sorted in ascending x order
@@ -145,10 +145,10 @@ def calculate_polynomial_coefficients_for_coupled_fit(
     times: np.ndarray = calculate_times_from_distances_and_relative_velocity(dataset)
     datapoints = dataset.get_datapoints()
 
-    i_sh = np.array(datapoints.get_shifted_intensities().get_values())
-    sigma_sh = np.array(datapoints.get_shifted_intensities().get_errors())
-    i_us = np.array(datapoints.get_unshifted_intensities().get_values())
-    sigma_us = np.array(datapoints.get_unshifted_intensities().get_errors())
+    i_sh = np.array(datapoints.get_normalized_shifted_intensities().get_values())
+    sigma_sh = np.array(datapoints.get_normalized_shifted_intensities().get_errors())
+    i_us = np.array(datapoints.get_normalized_unshifted_intensities().get_values())
+    sigma_us = np.array(datapoints.get_normalized_unshifted_intensities().get_errors())
 
     sort_idx = np.argsort(times)
     times = times[sort_idx]

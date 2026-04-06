@@ -27,7 +27,7 @@ def calculate_tau_i_values(
 
     # calculate decay times using the optimized coefficients
     tau_i_values: np.ndarray = (
-        dataset.get_datapoints().get_unshifted_intensities().get_values()
+        dataset.get_datapoints().get_normalized_unshifted_intensities().get_values()
         / evaluate_differentiated_polynomial_at_measuring_times(
             dataset, coefficients, knots, degree
         )
