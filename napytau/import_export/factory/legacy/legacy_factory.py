@@ -25,7 +25,7 @@ class LegacyFactory:
             LegacyFactory.parse_velocity(raw_dataset.velocity_rows),
             LegacyFactory.parse_datapoints(
                 raw_dataset.distance_rows,
-                raw_dataset.calibration_rows,
+                raw_dataset.normalisation_rows,
                 raw_dataset.fit_rows,
             ),
         )
@@ -65,19 +65,19 @@ class LegacyFactory:
     @staticmethod
     def parse_datapoints(
         distance_rows: List[str],
-        calibration_rows: List[str],
+        normalisation_rows: List[str],
         fit_rows: List[str],
     ) -> DatapointCollection:
         datapoints = DatapointCollection([])
         for distance_row in distance_rows:
             distance = LegacyFactory.parse_distance_row(distance_row)
             datapoints.add_datapoint(Datapoint(distance))
-        for calibration_row in calibration_rows:
-            (distance_index, calibration) = LegacyFactory.parse_calibration_row(
-                calibration_row
+        for normalisation_row in normalisation_rows:
+            (distance_index, normalisation) = LegacyFactory.parse_normalisation_row(
+                normalisation_row
             )
             datapoint = datapoints.get_datapoint_by_distance(distance_index)
-            datapoint.set_calibration(calibration)
+            datapoint.set_normalisation(normalisation)
         for fit_row in fit_rows:
             (
                 distance_index,
@@ -118,25 +118,25 @@ class LegacyFactory:
         return ValueErrorPair(distance, distance_error)
 
     @staticmethod
-    def parse_calibration_row(
-        calibration_row: str,
+    def parse_normalisation_row(
+        normalisation_row: str,
     ) -> Tuple[float, ValueErrorPair[float]]:
-        split_row = calibration_row.split(" ")
+        split_row = normalisation_row.split(" ")
         if len(split_row) < 3:
             raise ValueError(
-                f"Expected at least 3 values in calibration row, but got {len(split_row)}"  # noqa E501
+                f"Expected at least 3 values in normalisation row, but got {len(split_row)}"  # noqa E501
             )
 
         if len(split_row) > 3:
             raise ValueError(
-                f"Expected at most 3 values in calibration row, but got {len(split_row)}"  # noqa E501
+                f"Expected at most 3 values in normalisation row, but got {len(split_row)}"  # noqa E501
             )
 
         distance_index = float(split_row[0])
-        calibration = float(split_row[1])
-        calibration_error = float(split_row[2])
+        normalisation = float(split_row[1])
+        normalisation_error = float(split_row[2])
 
-        return distance_index, ValueErrorPair(calibration, calibration_error)
+        return distance_index, ValueErrorPair(normalisation, normalisation_error)
 
     @staticmethod
     def parse_fit_row(

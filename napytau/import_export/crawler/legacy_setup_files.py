@@ -10,27 +10,27 @@ class LegacySetupFiles:
     distances_file: PurePath
     velocity_file: PurePath
     fit_file: PurePath
-    calibration_file: PurePath
+    normalisation_file: PurePath
 
     def __init__(
         self,
         distances_file: PurePath,
         velocity_file: PurePath,
         fit_file: PurePath,
-        calibration_file: PurePath,
+        normalisation_file: PurePath,
     ):
         """Use the static constructor method instead"""
         self.distances_file = distances_file
         self.velocity_file = velocity_file
         self.fit_file = fit_file
-        self.calibration_file = calibration_file
+        self.normalisation_file = normalisation_file
 
     @staticmethod
     def create_from_file_names(file_paths: List[PurePath]) -> LegacySetupFiles:
         distances_file: PurePath
         velocity_file: PurePath
         fit_file: PurePath
-        calibration_file: PurePath
+        normalisation_file: PurePath
         missing_files = []
 
         try:
@@ -51,7 +51,7 @@ class LegacySetupFiles:
             missing_files.append("fit")
 
         try:
-            calibration_file = next(
+            normalisation_file = next(
                 file for file in file_paths if "norm.fac" in file.name
             )
         except StopIteration:
@@ -64,5 +64,5 @@ class LegacySetupFiles:
             )
 
         return LegacySetupFiles(
-            distances_file, velocity_file, fit_file, calibration_file
+            distances_file, velocity_file, fit_file, normalisation_file
         )

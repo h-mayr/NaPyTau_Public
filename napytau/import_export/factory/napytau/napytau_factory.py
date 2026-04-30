@@ -34,9 +34,9 @@ class NapyTauFactory:
                 coalesce(raw_datapoint.get("distance")),
                 coalesce(raw_datapoint.get("distanceError")),
             )
-            calibration = ValueErrorPair(
-                coalesce(raw_datapoint.get("calibration")),
-                coalesce(raw_datapoint.get("calibrationError")),
+            normalisation = ValueErrorPair(
+                coalesce(raw_datapoint.get("normalisation")),
+                coalesce(raw_datapoint.get("normalisationError")),
             )
             shifted_intensity = ValueErrorPair(
                 coalesce(raw_datapoint.get("shiftedIntensity")),
@@ -63,7 +63,7 @@ class NapyTauFactory:
             datapoints.append(
                 Datapoint(
                     distance,
-                    calibration,
+                    normalisation,
                     shifted_intensity,
                     unshifted_intensity,
                     feeding_shifted_intensity,

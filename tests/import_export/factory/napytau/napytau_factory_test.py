@@ -70,8 +70,8 @@ class NapytauFactoryUnitTest(unittest.TestCase):
                     {
                         "distance": 1,
                         "distanceError": 0.1,
-                        "calibration": 1,
-                        "calibrationError": 0.1,
+                        "normalisation": 1,
+                        "normalisationError": 0.1,
                         "shiftedIntensity": 1,
                         "shiftedIntensityError": 0.1,
                         "unshiftedIntensity": 1,
@@ -87,8 +87,8 @@ class NapytauFactoryUnitTest(unittest.TestCase):
             self.assertEqual(len(dataset.datapoints), 1)
             self.assertEqual(dataset.datapoints[0].distance.value, 1)
             self.assertEqual(dataset.datapoints[0].distance.error, 0.1)
-            self.assertEqual(dataset.datapoints[0].calibration.value, 1)
-            self.assertEqual(dataset.datapoints[0].calibration.error, 0.1)
+            self.assertEqual(dataset.datapoints[0].normalisation.value, 1)
+            self.assertEqual(dataset.datapoints[0].normalisation.error, 0.1)
             self.assertEqual(dataset.datapoints[0].shifted_intensity.value, 1)
             self.assertEqual(dataset.datapoints[0].shifted_intensity.error, 0.1)
             self.assertEqual(dataset.datapoints[0].unshifted_intensity.value, 1)
@@ -122,8 +122,8 @@ class NapytauFactoryUnitTest(unittest.TestCase):
                     {
                         "distance": 1,
                         "distanceError": 0.1,
-                        "calibration": 1,
-                        "calibrationError": 0.1,
+                        "normalisation": 1,
+                        "normalisationError": 0.1,
                         "shiftedIntensity": 1,
                         "shiftedIntensityError": 0.1,
                         "unshiftedIntensity": 1,
@@ -143,8 +143,8 @@ class NapytauFactoryUnitTest(unittest.TestCase):
             self.assertEqual(len(dataset.datapoints), 1)
             self.assertEqual(dataset.datapoints[0].distance.value, 1)
             self.assertEqual(dataset.datapoints[0].distance.error, 0.1)
-            self.assertEqual(dataset.datapoints[0].calibration.value, 1)
-            self.assertEqual(dataset.datapoints[0].calibration.error, 0.1)
+            self.assertEqual(dataset.datapoints[0].normalisation.value, 1)
+            self.assertEqual(dataset.datapoints[0].normalisation.error, 0.1)
             self.assertEqual(dataset.datapoints[0].shifted_intensity.value, 1)
             self.assertEqual(dataset.datapoints[0].shifted_intensity.error, 0.1)
             self.assertEqual(dataset.datapoints[0].unshifted_intensity.value, 1)

@@ -42,8 +42,8 @@ def init(cli_arguments: CLIArguments) -> None:
                     f"Error: {datapoint.get_distance().error}"
                 )
                 print(
-                    f"    Calibration: Value: {datapoint.get_calibration().value} "
-                    f"Error: {datapoint.get_calibration().error}"
+                    f"    Normalisation: Value: {datapoint.get_normalisation().value} "
+                    f"Error: {datapoint.get_normalisation().error}"
                 )
                 shifted_intensity, unshifted_intensity = datapoint.get_intensity()
                 print(
@@ -137,8 +137,8 @@ def init(cli_arguments: CLIArguments) -> None:
                     f"Error: {datapoint.get_distance().error}"
                 )
                 print(
-                    f"    Calibration: Value: {datapoint.get_calibration().value} "
-                    f"Error: {datapoint.get_calibration().error}"
+                    f"    Normalisation: Value: {datapoint.get_normalisation().value} "
+                    f"Error: {datapoint.get_normalisation().error}"
                 )
                 shifted_intensity, unshifted_intensity = datapoint.get_intensity()
                 print(

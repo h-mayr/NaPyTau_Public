@@ -4,11 +4,11 @@ from napytau.util.model.value_error_pair import ValueErrorPair
 
 
 class DatapointUnitTest(unittest.TestCase):
-    def test_raisesAnExceptionIfCalibrationIsAccessedBeforeInitialization(self):
-        """Raise an exception if calibration is accessed before initialization."""
+    def test_raisesAnExceptionIfNormalisationIsAccessedBeforeInitialization(self):
+        """Raise an exception if normalisation is accessed before initialization."""
         datapoint = Datapoint(ValueErrorPair(1.0, 0.1))
         with self.assertRaises(Exception):
-            datapoint.get_calibration()
+            datapoint.get_normalisation()
 
     def test_raisesAnExceptionIfIntensityIsAccessedBeforeInitialization(self):
         """Raise an exception if intensity is accessed before initialization."""

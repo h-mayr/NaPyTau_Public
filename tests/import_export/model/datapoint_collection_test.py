@@ -177,17 +177,17 @@ class DatapointCollectionUnitTest(unittest.TestCase):
             ),
         )
 
-    def test_canRetrieveCalibrations(self):
-        """Can retrieve calibrations"""
+    def test_canRetrieveNormalisations(self):
+        """Can retrieve normalisations"""
         collection = DatapointCollection(
             [
                 Datapoint(
                     distance=ValueErrorPair(12.12, 0.1),
-                    calibration=ValueErrorPair(1.0, 0.1),
+                    normalisation=ValueErrorPair(1.0, 0.1),
                 ),
                 Datapoint(
                     distance=ValueErrorPair(12.13, 0.1),
-                    calibration=ValueErrorPair(2.0, 0.1),
+                    normalisation=ValueErrorPair(2.0, 0.1),
                 ),
                 Datapoint(
                     distance=ValueErrorPair(12.14, 0.1),
@@ -196,7 +196,7 @@ class DatapointCollectionUnitTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            collection.get_calibrations(),
+            collection.get_normalisations(),
             ValueErrorPairCollection(
                 [ValueErrorPair(1.0, 0.1), ValueErrorPair(2.0, 0.1)]
             ),
