@@ -1,8 +1,8 @@
 from os import getcwd
 from typing import Optional
+from argparse import Namespace
 
 from napytau.util.coalesce import coalesce
-from argparse import Namespace
 
 
 class CLIArguments:
@@ -11,6 +11,7 @@ class CLIArguments:
     data_files_directory: str
     fit_file_path: Optional[str]
     setup_identifier: Optional[str]
+    simple_tau: bool
 
     def __init__(self, raw_args: Namespace):
         self.headless = coalesce(raw_args.headless, False)
@@ -18,6 +19,7 @@ class CLIArguments:
         self.data_files_directory = coalesce(raw_args.data_files_directory, getcwd())
         self.fit_file_path = raw_args.fit_file
         self.setup_identifier = raw_args.setup_identifier
+        self.tau_simple = raw_args.tau_simple
 
     def is_headless(self) -> bool:
         return self.headless
@@ -33,3 +35,6 @@ class CLIArguments:
 
     def get_setup_identifier(self) -> Optional[str]:
         return self.setup_identifier
+
+    def is_tau_simple(self) -> bool:
+        return self.tau_simple

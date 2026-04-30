@@ -1,11 +1,12 @@
+import numpy as np
+import autograd as ag
+
 from napytau.core.polynomials import (
     evaluate_differentiated_polynomial_at_measuring_times,
     evaluate_polynomial_at_measuring_time,
 )
-import numpy as np
-import autograd as ag
-
 from napytau.import_export.model.dataset import DataSet
+
 
 def calculate_covariance_matrix(
     dataset: DataSet,
@@ -24,12 +25,16 @@ def calculate_covariance_matrix(
     """
 
     datapoints = dataset.get_datapoints()
-    
+
     evaluate_polynomial = ag.jacobian(
-        lambda coefficients_x, distance: evaluate_polynomial_at_measuring_time(dataset, distance, coefficients_x),
+        lambda coefficients_x, distance: evaluate_polynomial_at_measuring_time(
+            dataset, distance, coefficients_x
+        ),
         argnum=1,
     )
-    jacobian_matrix: np.ndarray = evaluate_polynomial(coefficients, datapoints.get_distances().get_values())
+    jacobian_matrix: np.ndarray = evaluate_polynomial(
+        coefficients, datapoints.get_distances().get_values()
+    )
     # Construct the weight matrix from the inverse squared errors
     weight_matrix: np.ndarray = np.diag(
         1 / np.power(datapoints.get_shifted_intensities().get_errors(), 2)

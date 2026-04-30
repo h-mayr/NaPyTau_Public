@@ -1,3 +1,4 @@
+from typing import Tuple
 from napytau.core.chi import optimize_tau_factor
 from napytau.core.polynomials import (
     calculate_polynomial_coefficients_for_fit,
@@ -6,9 +7,8 @@ from napytau.core.polynomials import (
 from napytau.core.tau import calculate_tau_i_values
 from napytau.core.delta_tau import calculate_error_propagation_terms
 from napytau.core.tau_final import calculate_tau_final
-from typing import Tuple
-import numpy as np
 from napytau.import_export.model.dataset import DataSet
+import numpy as np
 
 
 def calculate_lifetime_for_fit(
