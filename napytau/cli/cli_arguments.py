@@ -1,8 +1,8 @@
 from os import getcwd
 from typing import Optional
+from argparse import Namespace
 
 from napytau.util.coalesce import coalesce
-from argparse import Namespace
 
 
 class CLIArguments:

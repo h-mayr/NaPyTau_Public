@@ -1,5 +1,8 @@
-import numpy as np
+"""Calculate tau simple without any fitting as the same option in Napatau."""
+
 from typing import Tuple
+import numpy as np
+
 
 from napytau.import_export.model.dataset import DataSet
 from napytau.core.time import calculate_times_from_distances_and_relative_velocity

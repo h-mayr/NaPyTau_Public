@@ -1,12 +1,15 @@
-from napytau.core.errors.polynomial_coefficient_error import (
-    PolynomialCoefficientError,
-)
 import numpy as np
 import scipy as sp
 
-from napytau.core.time import calculate_time_from_distance_and_relative_velocity, \
-    calculate_times_from_distances_and_relative_velocity
+from napytau.core.errors.polynomial_coefficient_error import (
+    PolynomialCoefficientError,
+)
+from napytau.core.time import (
+    calculate_time_from_distance_and_relative_velocity,
+    calculate_times_from_distances_and_relative_velocity,
+)
 from napytau.import_export.model.dataset import DataSet
+
 
 def evaluate_polynomial_at_measuring_times(
     dataset: DataSet,
@@ -40,9 +43,9 @@ def evaluate_polynomial_at_measuring_times(
 
 
 def evaluate_polynomial_at_measuring_time(
-        dataset: DataSet,
-        distance: float,
-        coefficients: np.ndarray,
+    dataset: DataSet,
+    distance: float,
+    coefficients: np.ndarray,
 ) -> np.ndarray:
     """
     Computes the sum of a polynomial evaluated at given time points.
@@ -58,18 +61,18 @@ def evaluate_polynomial_at_measuring_time(
     Returns:
         ndarray: Array of polynomial values evaluated at the given time points.
     """
-    
+
     if len(coefficients) == 0:
         raise PolynomialCoefficientError(
             "An empty array of coefficients can not be evaluated."
         )
-    
+
     time: float = calculate_time_from_distance_and_relative_velocity(dataset, distance)
     # Evaluate the polynomial sum at the given time points
     sum_at_measuring_distance: float = 0.0
     for exponent, coefficient in enumerate(coefficients):
         sum_at_measuring_distance += coefficient * pow(time, exponent)
-    
+
     return sum_at_measuring_distance
 
 
@@ -155,12 +158,14 @@ def calculate_polynomial_coefficients_for_tau_factor(
         ndarray: Array of polynomial coefficients for the tau factor.
     """
 
-    def polynomial_fit (x, *coefficients):
+    def polynomial_fit(x, *coefficients):
         # ensure that there is no zero in the coefficients to avoid division by zero
         if 0 in coefficients:
             for i in range(len(coefficients)):
                 if coefficients[i] == 0:
-                    coefficients = tuple(list(coefficients[:i]) + [1e-10] + list(coefficients[i+1:]))
+                    coefficients = tuple(
+                        list(coefficients[:i]) + [1e-10] + list(coefficients[i + 1 :])
+                    )
         return (
             np.poly1d(coefficients)(x) / np.polyder(np.poly1d(coefficients))(x)
         ) - tau_factor
