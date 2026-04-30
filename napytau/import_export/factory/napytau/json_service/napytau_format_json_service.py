@@ -38,14 +38,14 @@ _SCHEMA = """
             "description": "The error in the distance between the particles",
             "minimum": 0
           },
-          "calibration": {
+          "normalisation": {
             "type": "number",
-            "description": "The calibration factor for the data point",
+            "description": "The normalisation factor for the data point",
             "minimum": 0
           },
-          "calibrationError": {
+          "normalisationError": {
             "type": "number",
-            "description": "The error in the calibration factor for the data point",
+            "description": "The error in the normalisation factor for the data point",
             "minimum": 0
           },
           "shiftedIntensity": {
@@ -94,8 +94,8 @@ _SCHEMA = """
         "required": [
           "distance",
           "distanceError",
-          "calibration",
-          "calibrationError",
+          "normalisation",
+          "normalisationError",
           "shiftedIntensity",
           "shiftedIntensityError",
           "unshiftedIntensity",

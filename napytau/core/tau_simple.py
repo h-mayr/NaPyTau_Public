@@ -10,9 +10,9 @@ from napytau.core.time import calculate_times_from_distances_and_relative_veloci
 
 def _prepare_intensity_arrays(dataset):
     """Return the normalised peak areas and their uncertainties as intensity arrays."""
-    normalisation_factors = dataset.get_datapoints().get_calibrations().get_values()
+    normalisation_factors = dataset.get_datapoints().get_normalisations().get_values()
     normalisation_factors_uncertainties = (
-        dataset.get_datapoints().get_calibrations().get_errors()
+        dataset.get_datapoints().get_normalisations().get_errors()
     )
     intensities_unshifted = (
         dataset.get_datapoints().get_unshifted_intensities().get_values()

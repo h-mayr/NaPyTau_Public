@@ -51,7 +51,7 @@ def import_legacy_format_from_files(
                     FileReader.read_rows(setup_files.velocity_file),
                     FileReader.read_rows(setup_files.distances_file),
                     FileReader.read_rows(setup_files.fit_file),
-                    FileReader.read_rows(setup_files.calibration_file),
+                    FileReader.read_rows(setup_files.normalisation_file),
                 )
             ),
             setup_file_bundles,

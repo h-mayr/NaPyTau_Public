@@ -55,7 +55,7 @@ class LegacySetupFilesUnitTest(unittest.TestCase):
         self.assertEqual(setup_files.distances_file, PurePath("distances.dat"))
         self.assertEqual(setup_files.velocity_file, PurePath("v_c"))
         self.assertEqual(setup_files.fit_file, PurePath("test.fit"))
-        self.assertEqual(setup_files.calibration_file, PurePath("norm.fac"))
+        self.assertEqual(setup_files.normalisation_file, PurePath("norm.fac"))
 
 
 if __name__ == "__main__":

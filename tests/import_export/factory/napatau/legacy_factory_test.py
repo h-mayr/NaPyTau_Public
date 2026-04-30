@@ -65,8 +65,8 @@ class LegacyFactoryUnitTest(unittest.TestCase):
                 )
             )
 
-    def test_raisesAnExceptionIfACalibrationRowWithTooFewValuesIsProvided(self):
-        """Raises an exception if a calibration row with too few values is provided"""
+    def test_raisesAnExceptionIfANormalisationRowWithTooFewValuesIsProvided(self):
+        """Raises an exception if a normalisation row with too few values is provided"""
         with self.assertRaises(ValueError):
             LegacyFactory.create_dataset(
                 RawLegacyData(
@@ -77,8 +77,8 @@ class LegacyFactoryUnitTest(unittest.TestCase):
                 )
             )
 
-    def test_raisesAnExceptionIfACalibrationRowWithTooManyValuesIsProvided(self):
-        """Raises an exception if a calibration row with too many values is provided"""
+    def test_raisesAnExceptionIfANormalisationRowWithTooManyValuesIsProvided(self):
+        """Raises an exception if a normalisation row with too many values is provided"""
         with self.assertRaises(ValueError):
             LegacyFactory.create_dataset(
                 RawLegacyData(
@@ -148,10 +148,10 @@ class LegacyFactoryUnitTest(unittest.TestCase):
             dataset.datapoints.get_datapoint_by_distance(1).distance.error, 1
         )
         self.assertEqual(
-            dataset.datapoints.get_datapoint_by_distance(1).calibration.value, 1
+            dataset.datapoints.get_datapoint_by_distance(1).normalisation.value, 1
         )
         self.assertEqual(
-            dataset.datapoints.get_datapoint_by_distance(1).calibration.error, 1
+            dataset.datapoints.get_datapoint_by_distance(1).normalisation.error, 1
         )
         self.assertEqual(
             dataset.datapoints.get_datapoint_by_distance(1).shifted_intensity.value, 1
@@ -187,10 +187,10 @@ class LegacyFactoryUnitTest(unittest.TestCase):
             dataset.datapoints.get_datapoint_by_distance(1).distance.error, 1
         )
         self.assertEqual(
-            dataset.datapoints.get_datapoint_by_distance(1).calibration.value, 1
+            dataset.datapoints.get_datapoint_by_distance(1).normalisation.value, 1
         )
         self.assertEqual(
-            dataset.datapoints.get_datapoint_by_distance(1).calibration.error, 1
+            dataset.datapoints.get_datapoint_by_distance(1).normalisation.error, 1
         )
         self.assertEqual(
             dataset.datapoints.get_datapoint_by_distance(1).shifted_intensity.value, 1

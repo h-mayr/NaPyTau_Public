@@ -17,7 +17,7 @@ class Datapoint:
     """
 
     distance: ValueErrorPair[float]
-    calibration: Optional[ValueErrorPair[float]] = None
+    normalisation: Optional[ValueErrorPair[float]] = None
     shifted_intensity: Optional[ValueErrorPair[float]] = None
     unshifted_intensity: Optional[ValueErrorPair[float]] = None
     feeding_shifted_intensity: Optional[ValueErrorPair[float]] = None
@@ -31,14 +31,14 @@ class Datapoint:
     def set_distance(self, distance: ValueErrorPair[float]) -> None:
         self.distance = distance
 
-    def get_calibration(self) -> ValueErrorPair[float]:
-        if self.calibration is None:
-            raise ValueError("Calibration was accessed before initialization.")
+    def get_normalisation(self) -> ValueErrorPair[float]:
+        if self.normalisation is None:
+            raise ValueError("Normalisation was accessed before initialization.")
 
-        return self.calibration
+        return self.normalisation
 
-    def set_calibration(self, calibration: ValueErrorPair[float]) -> None:
-        self.calibration = calibration
+    def set_normalisation(self, normalisation: ValueErrorPair[float]) -> None:
+        self.normalisation = normalisation
 
     def get_intensity(self) -> Tuple[ValueErrorPair[float], ValueErrorPair[float]]:
         if self.shifted_intensity is None or self.unshifted_intensity is None:

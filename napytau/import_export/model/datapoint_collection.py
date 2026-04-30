@@ -62,13 +62,13 @@ class DatapointCollection:
             )
         )
 
-    def get_calibrations(self) -> ValueErrorPairCollection[float]:
+    def get_normalisations(self) -> ValueErrorPairCollection[float]:
         return ValueErrorPairCollection(
             list(
                 map(
-                    lambda datapoint: coalesce(datapoint.calibration),
+                    lambda datapoint: coalesce(datapoint.normalisation),
                     self.filter(
-                        lambda datapoint: datapoint.calibration is not None
+                        lambda datapoint: datapoint.normalisation is not None
                     ).elements.values(),
                 )
             )

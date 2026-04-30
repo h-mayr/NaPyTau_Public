@@ -235,7 +235,7 @@ class IngestUnitTest(unittest.TestCase):
             ["v_c_row"],
             ["distances.dat_row"],
             ["fit_row"],
-            ["calibration_row"],
+            ["normalisation_row"],
         ]
 
         with patch.dict(
@@ -274,8 +274,8 @@ class IngestUnitTest(unittest.TestCase):
             self.assertEqual(
                 legacy_factory_module_mock.LegacyFactory.create_dataset.mock_calls[0]
                 .args[0]
-                .calibration_rows,
-                ["calibration_row"],
+                .normalisation_rows,
+                ["normalisation_row"],
             )
 
     def test_callsTheLegacyFactoryWithTheRawLegacyDataIfAFitFileIsProvided(
@@ -305,7 +305,7 @@ class IngestUnitTest(unittest.TestCase):
             ["v_c_row"],
             ["distances.dat_row"],
             ["fit_row"],
-            ["calibration_row"],
+            ["normalisation_row"],
         ]
 
         with patch.dict(
@@ -347,8 +347,8 @@ class IngestUnitTest(unittest.TestCase):
             self.assertEqual(
                 legacy_factory_module_mock.LegacyFactory.create_dataset.mock_calls[0]
                 .args[0]
-                .calibration_rows,
-                ["calibration_row"],
+                .normalisation_rows,
+                ["normalisation_row"],
             )
 
     def test_usesTheFileReaderToReadTheRowsFromTheProvidedSetupFilePathWhenReadingLegacySetupData(
