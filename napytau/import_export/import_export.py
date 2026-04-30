@@ -76,7 +76,7 @@ def _configure_file_crawler_for_legacy_format(
                 compile_regex("v_c"),
                 compile_regex("distances.dat"),
                 compile_regex("norm.fac"),
-                compile_regex(".*.fit"),
+                compile_regex("*.fit"),
             ],
             lambda files: LegacySetupFiles.create_from_file_names(files),
         )

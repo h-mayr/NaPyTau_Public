@@ -41,7 +41,7 @@ class LegacyFactory:
                 f"Expected one velocity row, but got {len(filtered_velocities)}"
             )
 
-        split_velocity_row = filtered_velocities[0].split(" ")
+        split_velocity_row = filtered_velocities[0].split()
 
         if len(split_velocity_row) < 1:
             raise ValueError(
@@ -100,7 +100,7 @@ class LegacyFactory:
 
     @staticmethod
     def parse_distance_row(distance_row: str) -> ValueErrorPair[float]:
-        split_row = distance_row.split(" ")
+        split_row = distance_row.split()
         if len(split_row) < 3:
             raise ValueError(
                 f"Expected at least 3 values in distance row, but got {len(split_row)}"
@@ -121,7 +121,7 @@ class LegacyFactory:
     def parse_calibration_row(
         calibration_row: str,
     ) -> Tuple[float, ValueErrorPair[float]]:
-        split_row = calibration_row.split(" ")
+        split_row = calibration_row.split()
         if len(split_row) < 3:
             raise ValueError(
                 f"Expected at least 3 values in calibration row, but got {len(split_row)}"  # noqa E501
@@ -148,7 +148,7 @@ class LegacyFactory:
         Optional[ValueErrorPair[float]],
         Optional[ValueErrorPair[float]],
     ]:
-        split_row = fit_row.split(" ")
+        split_row = fit_row.split()
         if len(split_row) < 5:
             raise ValueError(
                 f"Expected at least 5 values in fit row, but got {len(split_row)}"
