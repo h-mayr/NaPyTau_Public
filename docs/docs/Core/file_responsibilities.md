@@ -11,9 +11,9 @@ The other functionality is to calculate polynomial coefficients. One function ju
 ### chi.py
 This file contains one function to calculate $\chi^{2}$ via this formula:
 
-\[
+$$
 \chi^{2} = \sum_{i}((\frac{I^{sh}_{i}-f^{(a_{1}, ..., a_{n})}(t_{i})}{\Delta I^{sh}_{i}})^2+w(\frac{I^{us}_{i} - \tilde{t}^{hyp}\frac{d}{dt}f^{(a_{1}, ..., a_{n})}(t_{i})}{\Delta I^{us}_{i}})^2) 
-\]
+$$
 
 and another function to optimize the tau factor $\tilde{t}^{hyp}$ by minimizing $\chi^{2}$. This optimization is implemented by using the minimize function from "scipy.optimize" with the mean of the total possible range of the tau factor as a starting point.
 

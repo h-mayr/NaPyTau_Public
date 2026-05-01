@@ -98,7 +98,7 @@ class IngestUnitTest(unittest.TestCase):
             import_legacy_format_from_files(PurePath("test_directory"))
             self.assertEqual(
                 file_crawler_module_mock.FileCrawler.mock_calls[0].args[0],
-                ["v_c", "distances.dat", "norm.fac", ".*.fit"],
+                ["v_c", "distances.dat", "norm.fac", "*.fit"],
             )
 
     def test_instantiatesTheFileCrawlerWithoutAFitPatternIfAFitFileIsProvided(self):
@@ -527,7 +527,9 @@ class IngestUnitTest(unittest.TestCase):
             self.assertEqual(
                 naptau_format_json_service_module_mock.NapytauFormatJsonService.parse_json_data.mock_calls[
                     0
-                ].args[0],
+                ].args[
+                    0
+                ],
                 "test_json_data",
             )
 
@@ -714,7 +716,9 @@ class IngestUnitTest(unittest.TestCase):
             napytau_factory_module_mock,
             file_writer_module_mock,
         ) = set_up_mocks()
-        napytau_format_json_service_module_mock.NapytauFormatJsonService.create_calculation_data_json_string.return_value = "test_calculation_data_string"
+        napytau_format_json_service_module_mock.NapytauFormatJsonService.create_calculation_data_json_string.return_value = (
+            "test_calculation_data_string"
+        )
 
         with patch.dict(
             "sys.modules",
@@ -745,7 +749,9 @@ class IngestUnitTest(unittest.TestCase):
             self.assertEqual(
                 napytau_format_json_service_module_mock.NapytauFormatJsonService.create_calculation_data_json_string.mock_calls[
                     0
-                ].args[0],
+                ].args[
+                    0
+                ],
                 dataset,
             )
 
@@ -760,7 +766,9 @@ class IngestUnitTest(unittest.TestCase):
             napytau_factory_module_mock,
             file_writer_module_mock,
         ) = set_up_mocks()
-        napytau_format_json_service_module_mock.NapytauFormatJsonService.create_calculation_data_json_string.return_value = "test_calculation_data_string"
+        napytau_format_json_service_module_mock.NapytauFormatJsonService.create_calculation_data_json_string.return_value = (
+            "test_calculation_data_string"
+        )
 
         with patch.dict(
             "sys.modules",
