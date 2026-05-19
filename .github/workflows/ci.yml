@@ -5,12 +5,12 @@ on:
     branches:
       - main
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,10 +21,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Lint everything
-        run: uv run ruff check --config ruff.toml
+        run: uvx tomlscript lint
 
   run-static-analysis:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,10 +36,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Run static analysis
-        run: uv run mypy napytau --config-file=mypy.ini
+        run: uvx tomlscript typecheck
 
   run-tests:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,4 +51,4 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
       - name: Run tests
-        run: uv run pytest -rA
+        run: uvx tomlscript test
