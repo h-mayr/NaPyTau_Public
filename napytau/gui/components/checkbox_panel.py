@@ -115,4 +115,8 @@ class CheckboxPanel:
         """
         self.parent.datapoints_for_calculation[
             index
-        ].active = not self.parent.datapoints_for_calculation[index].active
+        ].active_for_calculation = (
+            not self.parent.datapoints_for_calculation[index].active_for_calculation
+        )
+        self.parent.control_panel.recalculate()
+        self.parent.graph.update_plot()

@@ -56,6 +56,18 @@ class App(customtkinter.CTk):
         self.tau = tk.IntVar()
         self.tau.set(2)
 
+        # Fit mode: "lsq" | "smooth" | "coupled"
+        self.fit_mode: str = "lsq"
+        self.smoothing_factor: float | None = None
+        self.polynomial_degree: int = 2
+
+        # Knot auto-spacing
+        self.knot_spacing_mode: str = "manual"
+        self.n_auto_knots: int = 3
+
+        # Monte Carlo iterations (0 = disabled)
+        self.n_mc_iterations: int = 0
+
         # configure window
         self.title("NaPyTau")
         width = 1366
@@ -94,9 +106,13 @@ class App(customtkinter.CTk):
             "read_setup": self.read_setup,
             "quit": self.quit,
             "change_appearance_mode": self.change_appearance_mode,
-            "select_number_of_polynomials": self.select_number_of_polynomials,
-            "select_polynomial_mode": self.select_polynomial_mode,
             "select_alpha_calc_mode": self.select_alpha_calc_mode,
+            "set_fit_mode": self.set_fit_mode,
+            "set_degree": self.set_degree,
+            "set_smoothing_factor": self.set_smoothing_factor,
+            "set_knot_spacing_mode": self.set_knot_spacing_mode,
+            "set_n_auto_knots": self.set_n_auto_knots,
+            "set_n_mc_iterations": self.set_n_mc_iterations,
         }
 
         # Initialize the menu bar
@@ -111,7 +127,7 @@ class App(customtkinter.CTk):
         self.toolbar: Toolbar = Toolbar(self, self.graph.canvas)
 
         # Initialize the control panel
-        self.control_panel = ControlPanel(self)
+        self.control_panel: ControlPanel = ControlPanel(self)
 
         # Initialize the logger
         self.logger: Logger = Logger(self)
@@ -149,6 +165,7 @@ class App(customtkinter.CTk):
                 )
 
         if len(self.dataset) > 0:
+            self._reset_state()
             self.update_data_checkboxes()
             self.graph.update_plot()
 
@@ -244,28 +261,6 @@ class App(customtkinter.CTk):
         self.logger.switch_logger_appearance(self.menu_bar.appearance_mode.get())
         self.graph.update_plot()
 
-    def select_number_of_polynomials(self) -> None:
-        """
-        Selects the number of polynomials to use.
-        """
-        self.logger.log_message(
-            "selected number of polynomials: "
-            + self.menu_bar.number_of_polynomials.get()
-            + " but not implemented yet!",
-            LogMessageType.INFO,
-        )
-
-    def select_polynomial_mode(self) -> None:
-        """
-        Selects the polynomial mode.
-        """
-        self.logger.log_message(
-            "Polynomials set to "
-            + self.menu_bar.polynomial_mode.get()
-            + " but not implemented yet!",
-            LogMessageType.ERROR,
-        )
-
     def select_alpha_calc_mode(self) -> None:
         """
         Selects the alpha calculation mode.
@@ -276,6 +271,85 @@ class App(customtkinter.CTk):
             + " but not implemented yet!",
             LogMessageType.ERROR,
         )
+
+    def set_fit_mode(self, mode: str) -> None:
+        """Switch between LSQ, Smooth, and Coupled fit modes."""
+        self.fit_mode = mode
+        if mode == "lsq":
+            self.smoothing_factor = None
+        elif mode == "smooth":
+            try:
+                self.smoothing_factor = float(self.menu_bar.smoothing_var.get())
+            except ValueError:
+                self.smoothing_factor = 1.0
+        # "coupled" → smoothing_factor irrelevant, leave as-is
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def set_knot_spacing_mode(self, mode: str) -> None:
+        """Set the auto-knot spacing mode and regenerate knots if not manual."""
+        self.knot_spacing_mode = mode
+        if mode != "manual":
+            self._generate_auto_knots()
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def set_n_auto_knots(self, n: int) -> None:
+        """Set the number of interior auto-knots and regenerate."""
+        self.n_auto_knots = n
+        if self.knot_spacing_mode != "manual":
+            self._generate_auto_knots()
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def set_n_mc_iterations(self, n: int) -> None:
+        """Set the number of Monte Carlo iterations."""
+        self.n_mc_iterations = n
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def _generate_auto_knots(self) -> None:
+        """Compute interior knot positions and store them as sampling_points."""
+        import numpy as np
+        import scipy.constants
+
+        active = self.active_dataset
+        distances = active.get_datapoints().get_distances().get_values()
+        if len(distances) < 2:
+            return
+        d_min, d_max = min(distances), max(distances)
+        v = active.get_relative_velocity().value.get_velocity()
+        c = scipy.constants.speed_of_light
+        if v == 0:
+            return
+        n = self.n_auto_knots + 2  # include endpoints then slice interior
+        if self.knot_spacing_mode == "equidistant":
+            d_knots = np.linspace(d_min, d_max, n)[1:-1]
+        else:  # "log"
+            d_knots = np.geomspace(d_min, d_max, n)[1:-1]
+        t_knots = (d_knots / (v * c)).tolist()
+        self.dataset[0].set_sampling_points(t_knots)
+        self.graph._knot_distances = d_knots.tolist()
+
+    def set_degree(self, degree: int) -> None:
+        """Set the B-spline degree and refresh."""
+        self.polynomial_degree = degree
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def set_smoothing_factor(self, value: float) -> None:
+        """Set the smoothing factor, switch to Smooth mode, and refresh."""
+        self.smoothing_factor = value
+        self.menu_bar.fit_mode.set("smooth")
+        self.after(0, self._refresh_graph_and_calculation)
+
+    def _refresh_graph_and_calculation(self) -> None:
+        """Update the graph and recalculate τ (deferred so menus close first)."""
+        self.graph.update_plot()
+        self.control_panel.recalculate()
+        self.control_panel.update_status()
+
+    def _reset_state(self) -> None:
+        """Clear all per-dataset state before loading a new dataset."""
+        self.datapoints_for_fitting = DatapointCollection([])
+        self.datapoints_for_calculation = DatapointCollection([])
+        self.graph._knot_distances = []
+        self.graph.clear_knots()
 
     def update_data_checkboxes(self) -> None:
         """
@@ -289,6 +363,26 @@ class App(customtkinter.CTk):
 
         self.checkbox_panel.update_data_checkboxes_fitting()
         self.checkbox_panel.update_data_checkboxes_calculation()
+
+    @property
+    def active_dataset(self) -> DataSet:
+        """Return a DataSet with only the fitting-active datapoints."""
+        ds = self.dataset[0]
+        return DataSet(
+            relative_velocity=ds.get_relative_velocity(),
+            datapoints=ds.get_datapoints().get_active_datapoints(),
+            sampling_points=ds.get_sampling_points(),
+        )
+
+    @property
+    def active_dataset_for_calculation(self) -> DataSet:
+        """Return a DataSet with only the calculation-active datapoints."""
+        ds = self.dataset[0]
+        return DataSet(
+            relative_velocity=ds.get_relative_velocity(),
+            datapoints=ds.get_datapoints().get_active_for_calculation_datapoints(),
+            sampling_points=ds.get_sampling_points(),
+        )
 
     def get_datapoints(self) -> DatapointCollection:
         """

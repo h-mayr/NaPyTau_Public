@@ -278,6 +278,8 @@ class NapytauFormatJsonService:
                         map(
                             lambda polynomial: {
                                 "coefficients": polynomial.coefficients,
+                                "knots": polynomial.knots,
+                                "degree": polynomial.degree,
                             },
                             coalesce(dataset.get_polynomials()),
                         ),

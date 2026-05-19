@@ -1,3 +1,4 @@
+import tkinter as tk
 from tkinter import Frame
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,7 @@ from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk, FigureCanvas
 class CustomToolbar(NavigationToolbar2Tk):
     def __init__(self, canvas: FigureCanvasTkAgg, window: Frame, parent: "App") -> None:
         super().__init__(canvas, window)
+        self._app = parent
 
         # Change background color of the message label
         self._message_label.config(
@@ -29,3 +31,69 @@ class CustomToolbar(NavigationToolbar2Tk):
         # Remove superfluous buttons
         self.winfo_children()[9].destroy()
         self.winfo_children()[6].destroy()
+
+        # Knot mode toggle button — reflects current state of graph._knot_mode
+        knot_active = parent.graph._knot_mode
+        self._knot_button = tk.Button(
+            self,
+            text="✦ Knots: ON" if knot_active else "✦ Knots: OFF",
+            bg="#ff8c00" if knot_active else "green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_knot_mode,
+        )
+        self._knot_button.pack(side=tk.LEFT, padx=2)
+
+        # Y-scale toggle buttons for each subplot
+        self._ytau_button = tk.Button(
+            self,
+            text=f"Yτ: {parent.graph._axes_tau_yscale}",
+            bg="green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_ytau_scale,
+        )
+        self._ytau_button.pack(side=tk.LEFT, padx=2)
+
+        self._y1_button = tk.Button(
+            self,
+            text=f"Y₁: {parent.graph._axes1_yscale}",
+            bg="green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_y1_scale,
+        )
+        self._y1_button.pack(side=tk.LEFT, padx=2)
+
+        self._y2_button = tk.Button(
+            self,
+            text=f"Y₂: {parent.graph._axes2_yscale}",
+            bg="green",
+            fg="black",
+            relief="flat",
+            highlightthickness=0,
+            command=self._toggle_y2_scale,
+        )
+        self._y2_button.pack(side=tk.LEFT, padx=2)
+
+    def _toggle_ytau_scale(self) -> None:
+        self._app.graph.toggle_axes_tau_yscale()
+        self._ytau_button.config(text=f"Yτ: {self._app.graph._axes_tau_yscale}")
+
+    def _toggle_knot_mode(self) -> None:
+        self._app.graph.toggle_knot_mode()
+        if self._app.graph._knot_mode:
+            self._knot_button.config(text="✦ Knots: ON", bg="#ff8c00")
+        else:
+            self._knot_button.config(text="✦ Knots: OFF", bg="green")
+
+    def _toggle_y1_scale(self) -> None:
+        self._app.graph.toggle_axes1_yscale()
+        self._y1_button.config(text=f"Y₁: {self._app.graph._axes1_yscale}")
+
+    def _toggle_y2_scale(self) -> None:
+        self._app.graph.toggle_axes2_yscale()
+        self._y2_button.config(text=f"Y₂: {self._app.graph._axes2_yscale}")

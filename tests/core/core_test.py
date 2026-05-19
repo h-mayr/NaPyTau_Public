@@ -39,6 +39,11 @@ def _get_dataset_stub(datapoints: DatapointCollection) -> DataSet:
     )
 
 
+# Shared test knots returned by mocked fit functions
+_MOCK_COEFFICIENTS = np.array([1, 1, 1])
+_MOCK_KNOTS = np.array([0.0, 0.0, 0.5, 1.0, 1.0])
+
+
 class CoreUnitTest(unittest.TestCase):
     def test_CanCalculateALifetime(self):
         """Can calculate a lifetime"""
@@ -56,8 +61,10 @@ class CoreUnitTest(unittest.TestCase):
             [0.6, 0.2]
         )
 
-        polynomial_mock.calculate_polynomial_coefficients_for_tau_factor.return_value = np.array(
-            [1, 1, 1]
+        # Return a (coefficients, knots) tuple — new API
+        polynomial_mock.calculate_polynomial_coefficients_for_tau_factor.return_value = (
+            _MOCK_COEFFICIENTS,
+            _MOCK_KNOTS,
         )
 
         tau_final_mock.calculate_tau_final.return_value = (1.8, 0.18973666)
@@ -141,7 +148,18 @@ class CoreUnitTest(unittest.TestCase):
 
             np.testing.assert_array_equal(
                 tau_mock.calculate_tau_i_values.mock_calls[0].args[1],
-                np.array([1, 1, 1]),
+                _MOCK_COEFFICIENTS,
+            )
+
+            # Verify knots and degree are forwarded to calculate_tau_i_values
+            np.testing.assert_array_equal(
+                tau_mock.calculate_tau_i_values.mock_calls[0].args[2],
+                _MOCK_KNOTS,
+            )
+
+            self.assertEqual(
+                tau_mock.calculate_tau_i_values.mock_calls[0].args[3],
+                2,
             )
 
             self.assertEqual(
@@ -155,12 +173,18 @@ class CoreUnitTest(unittest.TestCase):
 
             np.testing.assert_array_equal(
                 delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[1],
-                np.array([1, 1, 1]),
+                _MOCK_COEFFICIENTS,
+            )
+
+            # Verify knots and degree are forwarded to calculate_error_propagation_terms
+            np.testing.assert_array_equal(
+                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[2],
+                _MOCK_KNOTS,
             )
 
             self.assertEqual(
-                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[2],
-                1.0,
+                delta_tau_mock.calculate_error_propagation_terms.mock_calls[0].args[3],
+                2,
             )
 
             self.assertEqual(len(tau_final_mock.calculate_tau_final.mock_calls), 1)

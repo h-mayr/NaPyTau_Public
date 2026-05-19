@@ -4,6 +4,7 @@ from typing import Dict, List, Callable, Iterator
 from napytau.import_export.model.datapoint import Datapoint
 from napytau.util.coalesce import coalesce
 from napytau.util.model.ValueErrorPairCollection import ValueErrorPairCollection
+from napytau.util.model.value_error_pair import ValueErrorPair
 
 
 class DatapointCollection:
@@ -98,6 +99,54 @@ class DatapointCollection:
             )
         )
 
+    def get_normalized_shifted_intensities(self) -> ValueErrorPairCollection[float]:
+        """Return shifted intensities multiplied by per-datapoint calibration factors.
+
+        Datapoints without a calibration value are returned with raw intensities.
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
+        """
+        result = []
+        for dp in self.elements.values():
+            if dp.shifted_intensity is None:
+                continue
+            sh = dp.shifted_intensity
+            if dp.calibration is not None:
+                norm = dp.calibration.value
+                sigma_norm = dp.calibration.error
+                result.append(
+                    ValueErrorPair(
+                        sh.value * norm,
+                        ((sh.error * norm) ** 2 + (sh.value * sigma_norm) ** 2) ** 0.5,
+                    )
+                )
+            else:
+                result.append(sh)
+        return ValueErrorPairCollection(result)
+
+    def get_normalized_unshifted_intensities(self) -> ValueErrorPairCollection[float]:
+        """Return unshifted intensities multiplied by per-datapoint calibration factors.
+
+        Datapoints without a calibration value are returned with raw intensities.
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
+        """
+        result = []
+        for dp in self.elements.values():
+            if dp.unshifted_intensity is None:
+                continue
+            us = dp.unshifted_intensity
+            if dp.calibration is not None:
+                norm = dp.calibration.value
+                sigma_norm = dp.calibration.error
+                result.append(
+                    ValueErrorPair(
+                        us.value * norm,
+                        ((us.error * norm) ** 2 + (us.value * sigma_norm) ** 2) ** 0.5,
+                    )
+                )
+            else:
+                result.append(us)
+        return ValueErrorPairCollection(result)
+
     def get_feeding_shifted_intensities(self) -> ValueErrorPairCollection[float]:
         return ValueErrorPairCollection(
             list(
@@ -138,3 +187,6 @@ class DatapointCollection:
 
     def get_active_datapoints(self) -> DatapointCollection:
         return self.filter(lambda datapoint: datapoint.active)
+
+    def get_active_for_calculation_datapoints(self) -> DatapointCollection:
+        return self.filter(lambda datapoint: datapoint.active_for_calculation)

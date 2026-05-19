@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -9,6 +10,8 @@ class Polynomial:
     """
 
     coefficients: list[float]
+    knots: Optional[list[float]] = None
+    degree: Optional[int] = None
 
     def get_coefficients(self) -> list[float]:
         return self.coefficients

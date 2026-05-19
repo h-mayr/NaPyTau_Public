@@ -1,6 +1,6 @@
 import tkinter as tk
+from tkinter import simpledialog
 import customtkinter
-from tkinter import Menu
 from typing import TYPE_CHECKING, Union
 
 from napytau.gui.components.logger import LogMessageType
@@ -44,17 +44,18 @@ class MenuBar(customtkinter.CTkFrame):
 
         # Setting up default values
         self.appearance_mode = tk.StringVar(value="system")
-        self.number_of_polynomials = tk.StringVar(value="3")
         self.alpha_calc_mode = tk.StringVar(value="sum ratio")
-        self.polynomial_mode = tk.StringVar(value="Exponential")
-        self.mode = tk.StringVar(value=IMPORT_FORMAT_NAPYTAU)
+        self.mode = tk.StringVar(value=IMPORT_FORMAT_LEGACY)
         self.mode.trace_add("write", self.on_mode_change)
+        self.fit_mode = tk.StringVar(value="lsq")
+        self.degree_var = tk.StringVar(value=str(parent.polynomial_degree))
+        self.smoothing_var = tk.StringVar(value="1.0")
 
         self._create_file_button()
         self._create_view_button()
-        self._create_polynomial_button()
         self._create_alpha_calc_button()
         self._create_mode_menu_button()
+        self._create_fit_menu_button()
 
     def _create_file_button(self) -> None:
         """
@@ -119,51 +120,6 @@ class MenuBar(customtkinter.CTkFrame):
             command=self.callbacks["change_appearance_mode"],
         )
 
-    def _create_polynomial_button(self) -> None:
-        """
-        Creates the button for the polynomial settings in the menubar.
-        """
-        self.polynomial_menu = tk.Menu(self, tearoff=0)
-
-        # Declare polynomial_button in advance for type checking
-        self.polynomial_button: Union[customtkinter.CTkButton, None] = None
-
-        self.polynomial_button = customtkinter.CTkButton(
-            self,
-            text="Polynomials",
-            command=lambda: open_dropdown_menu(
-                self.polynomial_menu, self.polynomial_button
-            ),
-        )
-        self.polynomial_button.grid(row=0, column=2, padx=5, pady=5)
-
-        number_of_polys_menu = Menu(self.polynomial_menu, tearoff=0)
-        self.polynomial_menu.add_cascade(
-            label="Number of Polynomials", menu=number_of_polys_menu
-        )
-
-        for i in range(1, 11):
-            number_of_polys_menu.add_radiobutton(
-                label=str(i),
-                variable=self.number_of_polynomials,
-                value=str(i),
-                command=self.callbacks["select_number_of_polynomials"],
-            )
-        self.polynomial_menu.add_separator()
-
-        self.polynomial_menu.add_radiobutton(
-            label="Equidistant",
-            variable=self.polynomial_mode,
-            value="Equidistant",
-            command=self.callbacks["select_polynomial_mode"],
-        )
-        self.polynomial_menu.add_radiobutton(
-            label="Exponential",
-            variable=self.polynomial_mode,
-            value="Exponential",
-            command=self.callbacks["select_polynomial_mode"],
-        )
-
     def _create_alpha_calc_button(self) -> None:
         """
         Creates the button for the alpha calculation settings in the menubar.
@@ -180,7 +136,7 @@ class MenuBar(customtkinter.CTkFrame):
                 self.alpha_calc_menu, self.alpha_calc_button
             ),
         )
-        self.alpha_calc_button.grid(row=0, column=3, padx=5, pady=5)
+        self.alpha_calc_button.grid(row=0, column=2, padx=5, pady=5)
 
         self.alpha_calc_menu.add_radiobutton(
             label="Sum Ratio",
@@ -211,7 +167,7 @@ class MenuBar(customtkinter.CTkFrame):
             command=lambda: open_dropdown_menu(self.mode_menu, self.mode_button),
         )
 
-        self.mode_button.grid(row=0, column=4, padx=5, pady=5)
+        self.mode_button.grid(row=0, column=3, padx=5, pady=5)
 
         self.mode_menu.add_radiobutton(
             label="Legacy",
@@ -223,6 +179,133 @@ class MenuBar(customtkinter.CTkFrame):
             variable=self.mode,
             value=IMPORT_FORMAT_NAPYTAU,
         )
+
+    def _create_fit_menu_button(self) -> None:
+        """Creates the Fit dropdown menu (fit method, degree, smoothing factor)."""
+        self.fit_menu = tk.Menu(self, tearoff=0)
+
+        self.fit_button: Union[customtkinter.CTkButton, None] = None
+
+        self.fit_button = customtkinter.CTkButton(
+            self,
+            text="Fit",
+            command=lambda: open_dropdown_menu(self.fit_menu, self.fit_button),
+        )
+        self.fit_button.grid(row=0, column=4, padx=5, pady=5)
+
+        # Fit method
+        self.fit_menu.add_radiobutton(
+            label="LSQ",
+            variable=self.fit_mode,
+            value="lsq",
+            command=self._on_fit_mode_change,
+        )
+        self.fit_menu.add_radiobutton(
+            label="Smooth",
+            variable=self.fit_mode,
+            value="smooth",
+            command=self._on_fit_mode_change,
+        )
+        self.fit_menu.add_radiobutton(
+            label="Coupled (shifted+unshifted)",
+            variable=self.fit_mode,
+            value="coupled",
+            command=self._on_fit_mode_change,
+        )
+
+        self.fit_menu.add_separator()
+
+        # Degree k submenu
+        degree_menu = tk.Menu(self.fit_menu, tearoff=0)
+        self.fit_menu.add_cascade(label="Degree k", menu=degree_menu)
+        for k in range(1, 6):
+            degree_menu.add_radiobutton(
+                label=str(k),
+                variable=self.degree_var,
+                value=str(k),
+                command=self._on_degree_change,
+            )
+
+        self.fit_menu.add_separator()
+
+        # Smoothing factor s submenu
+        smooth_menu = tk.Menu(self.fit_menu, tearoff=0)
+        self.fit_menu.add_cascade(label="Smoothing factor s", menu=smooth_menu)
+        for preset in ("0.01", "0.1", "0.5", "1.0", "2.0", "5.0", "10.0"):
+            smooth_menu.add_radiobutton(
+                label=preset,
+                variable=self.smoothing_var,
+                value=preset,
+                command=self._on_smoothing_change,
+            )
+        smooth_menu.add_separator()
+        smooth_menu.add_command(label="Custom…", command=self._on_smoothing_custom)
+
+        self.fit_menu.add_separator()
+
+        # Knot spacing submenu
+        self.knot_spacing_var = tk.StringVar(value="manual")
+        knot_menu = tk.Menu(self.fit_menu, tearoff=0)
+        self.fit_menu.add_cascade(label="Knot Spacing", menu=knot_menu)
+        for label, value in [
+            ("Manual", "manual"),
+            ("Equidistant", "equidistant"),
+            ("Logarithmic", "log"),
+        ]:
+            knot_menu.add_radiobutton(
+                label=label,
+                variable=self.knot_spacing_var,
+                value=value,
+                command=self._on_knot_spacing_change,
+            )
+        knot_menu.add_separator()
+        knot_menu.add_command(label="Number of knots…", command=self._ask_n_knots)
+
+        self.fit_menu.add_separator()
+
+        # Monte Carlo iterations
+        self.fit_menu.add_command(
+            label="MC Iterations…", command=self._ask_mc_iterations
+        )
+
+    def _on_fit_mode_change(self) -> None:
+        self.callbacks["set_fit_mode"](self.fit_mode.get())
+
+    def _on_knot_spacing_change(self) -> None:
+        self.callbacks["set_knot_spacing_mode"](self.knot_spacing_var.get())
+
+    def _ask_n_knots(self) -> None:
+        value = simpledialog.askinteger(
+            "Knots", "Number of interior knots:", minvalue=1, maxvalue=20
+        )
+        if value is not None:
+            self.callbacks["set_n_auto_knots"](value)
+
+    def _ask_mc_iterations(self) -> None:
+        value = simpledialog.askinteger(
+            "Monte Carlo",
+            "Number of MC iterations (0 = disabled):",
+            minvalue=0,
+            maxvalue=10000,
+        )
+        if value is not None:
+            self.callbacks["set_n_mc_iterations"](value)
+
+    def _on_degree_change(self) -> None:
+        self.callbacks["set_degree"](int(self.degree_var.get()))
+
+    def _on_smoothing_change(self) -> None:
+        self.callbacks["set_smoothing_factor"](float(self.smoothing_var.get()))
+
+    def _on_smoothing_custom(self) -> None:
+        value = simpledialog.askfloat(
+            "Smoothing factor",
+            "Enter smoothing factor s:",
+            minvalue=0.0,
+        )
+        if value is not None:
+            self.smoothing_var.set(str(value))
+            self.callbacks["set_smoothing_factor"](value)
 
     def on_mode_change(self, name: str, index: str, mode_value: str) -> None:
         self.parent.logger.log_message(

@@ -1,3 +1,4 @@
+import math
 import customtkinter
 from typing import TYPE_CHECKING
 
@@ -7,7 +8,6 @@ from napytau.core.core import (
     calculate_optimal_tau_factor,
     calculate_lifetime_for_custom_tau_factor,
 )
-from napytau.util.coalesce import coalesce
 
 if TYPE_CHECKING:
     from napytau.gui.app import App  # Import only for the type checking.
@@ -46,6 +46,10 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         Create the control panel widgets.
         """
+        # Row 0: Fit settings status
+        status_widget = self._create_status_widget()
+        status_widget.pack(fill="x", padx=5, pady=(5, 0))
+
         # Row 1: Timescale Controls
         timescale_widget = self._create_timescale_widget()
         timescale_widget.pack(fill="x", padx=5, pady=5)
@@ -58,48 +62,84 @@ class ControlPanel(customtkinter.CTkFrame):
         tau_widget = self._create_tau_widget()
         tau_widget.pack(fill="x", padx=5, pady=5)
 
+    def _create_status_widget(self) -> customtkinter.CTkFrame:
+        """Create the fit-settings status label."""
+        frame = customtkinter.CTkFrame(self)
+        self._status_var = customtkinter.StringVar(value=self._build_status_text())
+        label = customtkinter.CTkLabel(
+            frame,
+            textvariable=self._status_var,
+            font=("Arial", 11),
+            anchor="w",
+        )
+        label.pack(fill="x", padx=8, pady=3)
+        return frame
+
+    def _build_status_text(self) -> str:
+        """Build the status string from current app fit settings."""
+        fit_mode = self.parent.fit_mode
+        if fit_mode == "smooth" and self.parent.smoothing_factor is not None:
+            mode_str = f"Smooth (s={self.parent.smoothing_factor})"
+        elif fit_mode == "coupled":
+            mode_str = "Coupled"
+        else:
+            mode_str = "LSQ"
+        k = self.parent.polynomial_degree
+        knot_mode = self.parent.knot_spacing_mode
+        if knot_mode == "manual":
+            knots_str = "manual"
+        else:
+            knots_str = f"{knot_mode} ({self.parent.n_auto_knots})"
+        return f"Mode: {mode_str} | k={k} | Knots: {knots_str}"
+
+    def update_status(self) -> None:
+        """Refresh the status label to reflect current fit settings."""
+        self._status_var.set(self._build_status_text())
+
     def _create_timescale_widget(self) -> customtkinter.CTkFrame:
         """
         Create the timescale widget.
         """
 
-        timescale_min = 0.01
-        timescale_max = 100.0
+        self.timescale_min = 0.01
+        self.timescale_max = 10000.0
 
         frame = customtkinter.CTkFrame(self)
         frame.columnconfigure(0, weight=1)  # Button "t [ps]"
-        frame.columnconfigure(1, weight=1)  # Button "+0.1[ps]"
-        frame.columnconfigure(2, weight=1)  # Button "-0.1[ps]"
+        frame.columnconfigure(1, weight=1)  # Button "+5%"
+        frame.columnconfigure(2, weight=1)  # Button "-5%"
         frame.columnconfigure(
             3, weight=2
         )  # Entry field (More weight to make it bigger)
 
-        tau_factor = customtkinter.StringVar(value=str(self.timescale.get()))
+        self._tau_factor_var = customtkinter.StringVar(value=str(self.timescale.get()))
+        tau_factor = self._tau_factor_var
 
         def update_timescale() -> None:
             try:
                 value = float(tau_factor.get())
 
-                if timescale_min <= value <= timescale_max:
+                if self.timescale_min <= value <= self.timescale_max:
                     self.timescale.set(value)
                     self.parent.logger.log_message(
                         f"Timescale set to: {value}", LogMessageType.INFO
                     )
                     lifetime = calculate_lifetime_for_custom_tau_factor(
-                        self.parent.datasets[0],
+                        self.parent.active_dataset,
                         value,
-                        int(self.parent.menu_bar.number_of_polynomials.get()),
+                        self.parent.polynomial_degree,
+                        self.parent.smoothing_factor,
+                        fit_mode=self.parent.fit_mode,
+                        calculation_dataset=self.parent.active_dataset_for_calculation,
                     )
 
-                    self.result_tau.set(str(lifetime[0]))
-                    self.result_tau_error.set(str(lifetime[1]))
-
+                    self._apply_lifetime(lifetime)
                     self._tau_button_event(lifetime[0], lifetime[1])
 
                 else:
                     self.parent.logger.log_message(
-                        f"Error: Value out of valid range ({timescale_min:.2f}"
-                        f" - {timescale_max:.2f}).",
+                        f"Error: Value out of valid range ({self.timescale_min:.2f}"
+                        f" - {self.timescale_max:.2f}).",
                         LogMessageType.ERROR,
                     )
             except ValueError:
@@ -113,13 +153,15 @@ class ControlPanel(customtkinter.CTkFrame):
             if self._check_dataset_set():
                 tau_factor.set(f"{value:.2f}")
                 lifetime = calculate_lifetime_for_custom_tau_factor(
-                    coalesce(self.parent.dataset[0]),
+                    self.parent.active_dataset,
                     value,
-                    int(self.parent.menu_bar.number_of_polynomials.get()),
+                    self.parent.polynomial_degree,
+                    self.parent.smoothing_factor,
+                    fit_mode=self.parent.fit_mode,
+                    calculation_dataset=self.parent.active_dataset_for_calculation,
                 )
 
-                self.result_tau.set(str(lifetime[0]))
-                self.result_tau_error.set(str(lifetime[1]))
+                self._apply_lifetime(lifetime)
 
         update_timescale_button = customtkinter.CTkButton(
             frame,
@@ -129,26 +171,26 @@ class ControlPanel(customtkinter.CTkFrame):
         )
         update_timescale_button.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
-        # Function for adding and subtracting from tau factor in 0.1ps steps
+        # Function for adding and subtracting from tau factor in ±5% steps
 
-        add_on_tau_factor = (
-            lambda value: tau_factor.set(f"{float(tau_factor.get()) + value:.2f}")
-            if float(tau_factor.get()) + value >= 0.0
-            else None
-        )
+        def add_on_tau_factor(pct: float) -> None:
+            new_value = float(tau_factor.get()) * (1.0 + pct)
+            if new_value >= self.timescale_min:
+                tau_factor.set(f"{new_value:.4g}")
+                update_timescale()
 
         # Create buttons for adding and subtracting
         add_taufactor_button = customtkinter.CTkButton(
             frame,
-            text="+0.1[ps]",
-            command=lambda: add_on_tau_factor(0.1),
+            text="+5%",
+            command=lambda: add_on_tau_factor(0.05),
             width=10,
         )
 
         subtract_taufactor_button = customtkinter.CTkButton(
             frame,
-            text="-0.1[ps]",
-            command=lambda: add_on_tau_factor(-0.1),
+            text="-5%",
+            command=lambda: add_on_tau_factor(-0.05),
             width=10,
         )
 
@@ -159,8 +201,8 @@ class ControlPanel(customtkinter.CTkFrame):
 
         slider = customtkinter.CTkSlider(
             frame,
-            from_=timescale_min,
-            to=timescale_max,
+            from_=self.timescale_min,
+            to=self.timescale_max,
             variable=self.timescale,
             command=sync_slider,
         )
@@ -215,7 +257,7 @@ class ControlPanel(customtkinter.CTkFrame):
         frame.columnconfigure(2, weight=1)
 
         button = customtkinter.CTkButton(
-            frame, text="τ ± Δτ [ps]:", command=lambda: self._tau_button_event(0.0, 0.0)
+            frame, text="Calculate τ", command=self.recalculate
         )
 
         label = customtkinter.CTkLabel(frame, text="|τ - t| [ps]:")
@@ -292,6 +334,29 @@ class ControlPanel(customtkinter.CTkFrame):
         """
         self.timescale.set(round(float(value), 2))
 
+    @staticmethod
+    def _format_lifetime(tau: float, delta_tau: float) -> tuple[str, str]:
+        """Format τ and Δτ so that Δτ shows 2 significant figures and τ is
+        rounded to the same decimal place."""
+        if not (math.isfinite(delta_tau) and delta_tau > 0):
+            return f"{tau:.4g}", f"{delta_tau:.4g}"
+        magnitude = math.floor(math.log10(delta_tau))
+        decimal_places = max(0, -(magnitude - 1))
+        return f"{tau:.{decimal_places}f}", f"{delta_tau:.{decimal_places}f}"
+
+    def _apply_lifetime(self, lifetime: tuple[float, float]) -> None:
+        """Set τ ± Δτ display, logging an error if τ is negative."""
+        tau, delta_tau = lifetime
+        if tau < 0:
+            self.parent.logger.log_message(
+                f"Calculation error: τ = {tau:.4g} ps is negative.",
+                LogMessageType.ERROR,
+            )
+            return
+        tau_str, delta_tau_str = self._format_lifetime(tau, delta_tau)
+        self.result_tau.set(tau_str)
+        self.result_tau_error.set(delta_tau_str)
+
     def _tau_button_event(self, value: float, error: float) -> None:
         """
         Event if the tau button is clicked.
@@ -304,14 +369,31 @@ class ControlPanel(customtkinter.CTkFrame):
         Event if the chi2 button is clicked.
         """
         if self._check_dataset_set():
-            self.set_result_chi_squared(
-                calculate_optimal_tau_factor(
-                    coalesce(self.parent.dataset[0]),
-                    (5, 100),
-                    1.0,
-                    int(self.parent.menu_bar.number_of_polynomials.get()),
-                )
+            optimal_tau = calculate_optimal_tau_factor(
+                self.parent.active_dataset,
+                (self.timescale_min, self.timescale_max),
+                1.0,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
+                initial_guess=self.timescale.get(),
             )
+            self.set_result_chi_squared(optimal_tau)
+
+            # Update slider and entry field to the optimal tau factor
+            self.timescale.set(optimal_tau)
+            self._tau_factor_var.set(f"{optimal_tau:.2f}")
+
+            # Recalculate τ ± Δτ for the new tau factor
+            lifetime = calculate_lifetime_for_custom_tau_factor(
+                self.parent.active_dataset,
+                optimal_tau,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
+                calculation_dataset=self.parent.active_dataset_for_calculation,
+            )
+            self._apply_lifetime(lifetime)
 
     def _absolute_tau_button_event(self) -> None:
         """
@@ -350,6 +432,29 @@ class ControlPanel(customtkinter.CTkFrame):
         :param absolute_tau_t: The new value for the absolute tau value.
         """
         self.result_absolute_tau_t.set(absolute_tau_t)
+
+    def recalculate(self) -> None:
+        """
+        Re-run the lifetime calculation with the current tau factor and
+        update the result displays. Called automatically after knots change.
+        """
+        if not self._check_dataset_set():
+            return
+        try:
+            value = self.timescale.get()
+            lifetime = calculate_lifetime_for_custom_tau_factor(
+                self.parent.active_dataset,
+                value,
+                self.parent.polynomial_degree,
+                self.parent.smoothing_factor,
+                fit_mode=self.parent.fit_mode,
+                calculation_dataset=self.parent.active_dataset_for_calculation,
+            )
+            self._apply_lifetime(lifetime)
+        except Exception as e:
+            self.parent.logger.log_message(
+                f"Calculation failed: {e}", LogMessageType.ERROR
+            )
 
     def _check_dataset_set(self) -> bool:
         """

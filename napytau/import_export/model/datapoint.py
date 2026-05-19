@@ -24,6 +24,7 @@ class Datapoint:
     feeding_unshifted_intensity: Optional[ValueErrorPair[float]] = None
     tau: Optional[ValueErrorPair[float]] = None
     active: bool = True
+    active_for_calculation: bool = True
 
     def get_distance(self) -> ValueErrorPair[float]:
         return self.distance
@@ -48,6 +49,29 @@ class Datapoint:
             self.shifted_intensity,
             self.unshifted_intensity,
         )
+
+    def get_normalized_intensity(
+        self,
+    ) -> Tuple[ValueErrorPair[float], ValueErrorPair[float]]:
+        """Return (shifted, unshifted) intensities multiplied by the calibration factor.
+
+        If no calibration is set, raw intensities are returned.
+        Error propagation: σ(I·norm)² = (σI·norm)² + (I·σnorm)²
+        """
+        sh, us = self.get_intensity()
+        if self.calibration is None:
+            return sh, us
+        norm = self.calibration.value
+        sigma_norm = self.calibration.error
+        sh_norm = ValueErrorPair(
+            sh.value * norm,
+            ((sh.error * norm) ** 2 + (sh.value * sigma_norm) ** 2) ** 0.5,
+        )
+        us_norm = ValueErrorPair(
+            us.value * norm,
+            ((us.error * norm) ** 2 + (us.value * sigma_norm) ** 2) ** 0.5,
+        )
+        return sh_norm, us_norm
 
     def set_intensity(
         self,
